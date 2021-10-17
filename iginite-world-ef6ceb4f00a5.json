@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "iginite-world",
+  "private_key_id": "ef6ceb4f00a5226226968f97156db66e36ffd016",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDF/+eHyX9QGSsp\nvPtIAtRrIlbiWQ5UmT4Vi4BSOeIkhLw5ofyQs5imK2wBzesuUq9VpHiUnw+wUYRD\nYndogkPYx0EPTBEoMxbQdMWw8jMTJ9s4um//RK1FZ38LcuaHxYIUCcvfxjVy/EPA\nk5k7/1j/9jsrvxesozZkQE107eB/BFxlN9NEA6uXHxxQPT9A9NMNZXkPiRFaRod8\nMKCjMV45y6k36FU3Kpo21GL0F+BGN2JSBnQEaCuk5L4f+V6NZud8WpZORy1paf2l\nT1lMKkD6BcOTDA7AQychAQAnklyl/dXQrjWjrmA89mwpTQMfUllvmsYbtS3BM09h\nnNyzGLHDAgMBAAECggEAYETG1XouiQrbtiz4/i/GCRsGpIIJWi+yBHax2wjiv7+7\n5sewTcjMsQqOtqfgr8KrFlhj+lsGHUPdK4g+J5WimE11ABOLigChGJSWJCz2kVtB\nFulrF/HTz1l9Z1sj5CKvVr/WnQQ5q6Ek7ga1q/rA0p7tcR01zQ4EHaU4I+Ce1RI0\nvP6o7/AdNOebaLYM6s88qeXxdGBGKmV4MTfMM8/XNviiw+/tMgScOHK/3ayvaeL6\nFkl24hRkxePzIYuu7hC24frHneLYis6x0dTKI1sjw7CKGtuxdJVHv4GDjtnGjVFp\nPCgakjC5Ax0J0BrQYVko0jYAf77kuT1XDIbc0l49CQKBgQD9uDhBtVgI6wOFIZeD\n0wRTUGpyRTMkDlyw5LDoIxtU/X0NBa/1mSo93PAmSAogo2yn7yG8nPDC17EZzDDF\nLdottbP32eWQKk5WEFe7uswlCMpnC/MYooo+oNQErYTLoDQf6e99ENHruMXr6Oc3\nY/MTk/oxvRqGLqCwEZ1kuUDO6QKBgQDHx3qwwrn5mai94jAd+dGKRAT/eARq3vNy\nO7wDPGUll9kO+T3Mpr1ucoIOA9+HNVlvwpw9e8pQSJIBW3QcC2iES8TsKY6IdAe8\nvUHJKtPDKvMpTsK0pQiK8j2Ynodd9Sde54icK8pVMWsnZ/z/Bhij9BFzq0opeDJQ\n8yInGYJHywKBgFOAirtNdKDSwADT0mrnSxgkcjQThEZMl8L8MSDlVPx+xOZBRez9\nsMJVcZAXy4V8Y6lNcXwC5tYpaLcF1dM/SPwcPhPHWd89nTSEAmvdiYxyvTJ241Xr\nQLZl9gFoHjlqC12pf1FY9M2wrSr8JwS612hNHl26T/1zYR0xXuykb6jpAoGAa1de\nL81g+aC7TtNSgTiygrULbmyBCx8h9RXtblusCSfuo6H9t5E7pTV3dapVFyPuGyOY\nqVxzFvH3KS2HVG44ySSg+TdW8zBM2/dgeoM9ZtcT8fT0nvUxgt6ng/Jhz3Uio1aK\nS0coHuA/r9uqzyfqY2WHXvwBDAkeF+qbRiDppEMCgYBZVSaOQ6MEivPIg8WuveEc\nT8dbFB40LewfWaxId3fQ2PXdrui6xrAfhd0axk6a6DC4TupQxT57fttcNZIOlzVW\ni+MZvS+3Jz8iZWCnWvpwk40Dv4T6jB1gaYFDt76fygW/KDOqxG+oZPadBopl500l\nELNbgch57j0iYi5Pz33kpA==\n-----END PRIVATE KEY-----\n",
+  "client_email": "iginite-service@iginite-world.iam.gserviceaccount.com",
+  "client_id": "101639807343143902729",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/iginite-service%40iginite-world.iam.gserviceaccount.com"
+}

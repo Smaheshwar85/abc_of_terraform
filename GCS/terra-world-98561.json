@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "terra-world-98561",
+  "private_key_id": "ba4ee487ee9038d66a672253eff3e8dcbe10578d",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEuwIBADANBgkqhkiG9w0BAQEFAASCBKUwggShAgEAAoIBAQCt0rX+6eSsEmWC\nIytjwSMVyT2Yqvv8mQGD4TAkfbtR9vDruUJpLSAr0G9FmMakbQwOXpLQe0I044mo\nXTq9/SFnysPEhVx2O9LPnAwtOJMwIw/zO9rFxTwSQw9BMMDHkH82u1ai1xDDvWc1\nDu3X+49LXK1vVyCSwi+tFJ0+G+RJ0516TXhXx8IpgWmjDB2x2od4+h0AcIgGTZby\nGTHb84Nbb/fC9mzvWYQFTbSo4CERz/uxfLz4W9BxLXeI8d4/GWDsmWyoFaYk3rQL\nO9pU/gItCo0A0Ji9+cg9kOhBB+0CdxkMzuqPxolRLcqXVt7hHZzSTZze4Wb+XQno\nP72RsF2RAgMBAAECgf9PgxjysoCCoH0D5Ufufw/9jJXl8CZfNd5rj+blyl3q8Hrk\nWVT3p5y/w2jNp++150FMkWu3J6rxZo7hupkpr1DzRDKpAsLOPYSr/fB+qb0ql99Z\nSa1EKnoqywzUqpMvYU8lSizR8G8gGtPLLDkVmLfDpsaZ19EepkAI0b/cBAY5fm0v\nr26JZiNkNlYDsv+tuVXTfPqo3tJ58CrAxwc3ZywYJuvPTEu0sg8w48iSR3K7sfrj\nRjBF+k4sQBNMZCBoLdVwLK6BPYXQQ/I6J7rbVx3Pr+dkOFgA7TxHMMHI4CYbzt05\nqVC47+P6mYlHYH+IErOW+ED+Y35QdTuHfkR7HOECgYEA1UJX2WYHNpN9dL6M+cq2\nwvY5DX/hZhs93pAY3kF69IW7slFhmvETwp/UUGdpWoPgmv7ZtV3aTOc0bJGhcv9M\n/5FCgQSFS8LYAD4TcI8Kx2dhNRs3QROv0jI/LI+vlkhuJ4sxL9WpiouBhdmhr2lV\nPQ8rSBcHMAR0/3axVHlDgjECgYEA0KkG/PY4lGyUMlYM+rmzkEyriMe1Ssl5KK9d\nTb3fOoofLG7HjYhszHAycfVE/9JBb7pTEhDUI8vMUq6EjEy/a7ZRPSJMwHb74yMm\naXlIl03Pfm/fDmXK09lK0zO4N21jaB6vcr/BY1Vt7pCglhhlQ05ZvDLjCGWhzSuE\nj90pWWECgYA0Rc7Cuv+JoR1fQFXN5KJnp3LUnEPjg0nnA+sUj3hT93PKgagrEmyF\niCfCjZaFWU30sAMtMZQQxZtUAV5RkcKN4k0q0rDZoSjQ5mZdcLJzriNloQYqLWkr\nXKWfhpjDfX2Cs9uangSwsQFOjcnT9T2vechiI0LfwjfrZmyRCChEAQKBgEO/zfwO\nehp/ErMxS2+RIiNlMYDszwlkV0mFfvcCAlwAgtSrd3GV7TWH7Gkh6PBjNUnwpo5E\nFo0027ew4GqpdLGldcUywNbxCyIZxJwUfCRcaFW2Pydul6encusWbObaRp+E7xSD\n/GejUllWbj2t2Bs9cldv8lVEon96dMU9WvKhAoGBAIl+UiLjSnp5DwwOsZsBR8Vm\nDWLuCR/0R+JnK0nvxGxKeFjGVPpuXN+x8xObdEIYfLor4MMedsQ2I/S3ZnWkaAk+\nG5THiXRVnfR+GJ3oP503d3CBp5TjIBG9ivSk9+3n/koLguXSDxEN5kLNqmA4t/PJ\nbGQfLnbSmGSqnMTe9V/o\n-----END PRIVATE KEY-----\n",
+  "client_email": "terraform-roles@terra-world-98561.iam.gserviceaccount.com",
+  "client_id": "104205839571890929542",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/terraform-roles%40terra-world-98561.iam.gserviceaccount.com"
+}

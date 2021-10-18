@@ -1,0 +1,30 @@
+provider "google" {
+  credentials ="terra-world-98561.json"
+  project = "iginite-world" 
+  region  = "us-central1"
+  zone    = "us-central1-c"
+}
+
+resource "google_compute_instance" "vm_instance" {
+  name         = "terraform-instance1"
+  machine_type = "f1-micro"
+
+  boot_disk {
+    initialize_params {
+      image = "debian-cloud/debian-9"
+    }
+  }
+  
+ network_interface {
+    # A default network is created for all GCP projects
+    network = "default"
+    access_config {
+    }
+  }
+}
+
+module "iam -roles"{
+service_account =var.service_account
+roles   =var.bucket_roles
+prject_id =var.project
+}

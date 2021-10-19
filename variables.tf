@@ -1,4 +1,4 @@
-variables "service_account" {
+variable "service_account" {
 type = string
 }
 variable "zone" {
@@ -30,10 +30,10 @@ variable "project_network" {
   default = "default"
   description = "Network we will using for compute instance creation"
 }
-variables "bucket_roles" {
+variable "bucket_roles" {
 type = list
 }
 
-variables "project" {
+variable "project" {
 type = string
 }

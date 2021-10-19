@@ -1,5 +1,5 @@
 provider "google" {
-  credentials =credentials("terraform-auth")
+  
   project = "iginite-world" 
   region  = "us-central1"
   zone    = "us-central1-c"

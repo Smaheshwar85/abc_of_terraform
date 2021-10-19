@@ -5,7 +5,7 @@ provider "google" {
   zone    = var.zone
 }
 
-resource "google_compute_instance" "default" {
+resource "google_compute_instance" "vm_instance" {
   name         = var.gce_name
   machine_type = var.machine_type
   zone         = var.zone

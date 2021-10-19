@@ -21,7 +21,7 @@ resource "google_compute_instance" "default" {
       }
     }
 }
-module "iam -roles"{
+module "iam-roles"{
 service_account =var.service_account
 roles   =var.bucket_roles
 prject_id =var.project

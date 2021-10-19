@@ -42,8 +42,9 @@ resource "google_service_account" "sa" {
 }
 
 resource "google_service_account_iam_binding" "admin-account-iam" {
+  count              =length(var.bucket_roles)
   service_account_id = google_service_account.sa.name
-  role               = var.bucket_roles
+  role               = var.bucket_roles[count.index]
 
   members = [
     "user:smahesh2305@gmail.com",

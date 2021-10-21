@@ -8,7 +8,7 @@ variable "zone" {
 }
 variable "region" {
   type = string
-  default = "us-central1"
+  default = "europe-west1"
   description = "Please mention region for your resource default is us-central1"
 }
 variable "machine_type" {

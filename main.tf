@@ -20,7 +20,7 @@ service_account =var.service_account
 roles   =var.bucket_roles
 prject_id =var.project
 } */
-resource "google_project_iam_binding" "project" {
+/*resource "google_project_iam_binding" "project" {
   count   =length(var.bucket_roles)
   project = var.project
   role   = var.bucket_roles[count.index]
@@ -28,7 +28,7 @@ resource "google_project_iam_binding" "project" {
   members = [
     "user:smahesh2305@gmail.com",
   ]
-}
+}*/
 
 
 /*resource "google_service_account" "sa" {

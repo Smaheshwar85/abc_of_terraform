@@ -8,6 +8,7 @@ resource "google_compute_instance" "vm_instance" {
       image = var.image
     }
   }
+  
     network_interface{
     network = var.project_network
       access_config {

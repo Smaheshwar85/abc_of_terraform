@@ -1,0 +1,50 @@
+{
+  "displayName": "GCE VM Instance Monitoring",
+  "dashboardFilters": [],
+  "mosaicLayout": {
+    "columns": 40,
+    "tiles": [
+      {
+        "width": 16,
+        "height": 19,
+        "widget": {
+          "alertChart": {
+            "name": "${cpu_alert}"
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "width": 16,
+        "height": 19,
+        "widget": {
+          "alertChart": {
+            "name": "${memo_alert}"
+          }
+        }
+      },
+      {
+        "yPos": 19,
+        "width": 16,
+        "height": 19,
+        "widget": {
+          "alertChart": {
+            "name": "${disk_alert}"
+          }
+        }
+      },
+      {
+        "xPos": 16,
+        "yPos": 19,
+        "width": 16,
+        "height": 19,
+        "widget": {
+          "alertChart": {
+            "name": "${uptime_alert}"
+          }
+        }
+      }
+    ]
+  },
+  "labels": {}
+}

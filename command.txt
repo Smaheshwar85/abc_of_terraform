@@ -1,0 +1,3 @@
+terraform apply -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec1.tfvars"
+
+terraform plan -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec2.tfvars"

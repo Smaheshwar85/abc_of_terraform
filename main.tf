@@ -1,24 +1,28 @@
-provider "google" {
-  
-  project = "iginite-world" 
-  region  = "us-central1"
-  zone    = "us-central1-c"
+module "logging_bucket" {
+  source = "./modules/logging_bucket"
+  project_id = var.project_id
+  location = var.location
+  retention_days = var.retention_days
+  bucket_id = var.bucket_id
+  description = var.description
 }
 
-resource "google_compute_instance" "vm_instance" {
-  name         = "terraform-instance3"
-  machine_type = "f1-micro"
+module "logging_sink" {
+  source = "./modules/logging_sink"
+  depends_on = [module.logging_bucket]
+  sink_project_id = var.sink_project_id
+  sink_name = var.sink_name
+  destination_project_id = var.destination_project_id
+  destination_location = var.destination_location
+  destination_bucket_id = var.destination_bucket_id
+  filter = var.filter
+}
 
-  boot_disk {
-    initialize_params {
-      image = "debian-cloud/debian-9"
-    }
-  }
-  
- network_interface {
-    # A default network is created for all GCP projects
-    network = "default"
-    access_config {
-    }
-  }
+module "iam_roles" {
+  source = "./modules/iam_roles"
+  depends_on = [module.logging_sink]
+  project_id = var.project_id
+  bucket_writer_role = var.bucket_writer_role
+  view_accessors_role = var.view_accessors_role
+  writer_identity = module.logging_sink.sink_service_account_email
 }

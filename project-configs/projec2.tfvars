@@ -1,0 +1,13 @@
+project_id = "data-engineering-demo-413211"
+sink_project_id = "maximal-centaur-413208"
+location = "global"
+retention_days = 60
+bucket_id = "project2center_for_allLogs_08042024"
+description = "center for all logs (Managed by Terraform)"
+sink_name = "logeer_sink"
+destination_project_id = "data-engineering-demo-413211"
+destination_location = "global"
+destination_bucket_id = "project2center_for_allLogs_08042024"
+filter = "severity >= ERROR"
+bucket_writer_role = "roles/logging.bucketWriter"
+view_accessors_role = "roles/logging.viewAccessor"

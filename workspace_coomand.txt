@@ -1,0 +1,23 @@
+terraform apply -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec1.tfvars"
+
+terraform plan -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec1.tfvars"
+
+terraform destroy -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec1.tfvars"
+
+
+terraform apply -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec2.tfvars"
+
+terraform plan -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec2.tfvars"
+
+
+# Initialize workspaces
+terraform workspace new project1
+terraform workspace new project2
+
+# Apply configurations for project1
+terraform workspace select project1
+terraform apply -var-file=project1.tfvars
+
+# Apply configurations for project2
+terraform workspace select project2
+terraform apply -var-file=project2.tfvars

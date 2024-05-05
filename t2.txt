@@ -1,0 +1,57 @@
+what does the statement means "Enable customer managed Encryption keys (cmek) for gke persistent disk"please explain with example
+########################
+"Enable customer managed Encryption keys (CMEK) for GKE persistent disk" means allowing users to manage the encryption keys used to encrypt data stored on Google Kubernetes Engine (GKE) persistent disks.
+
+Here's an explanation with an example:
+
+Let's say you have a Kubernetes cluster running on Google Kubernetes Engine (GKE), and you have persistent disks attached to your cluster to store data. By default, Google Cloud Platform (GCP) manages the encryption keys used to encrypt the data on these disks. However, with CMEK, you can take control of the encryption keys and manage them yourself.
+
+Here's how you might enable CMEK for GKE persistent disks:
+
+Create a Key Ring and Encryption Key: First, you would create a key ring and an encryption key in Google Cloud Key Management Service (KMS). This key will be used to encrypt and decrypt the data on your persistent disks.
+Grant Necessary Permissions: You need to ensure that the service account associated with your GKE cluster has the necessary permissions to use the encryption key from KMS. This typically involves assigning the appropriate roles to the service account.
+Configure CMEK for Persistent Disks: Once you have created the encryption key and granted permissions, you can configure CMEK for your GKE persistent disks. This involves specifying the key and keyring that you want to use for encryption when creating or attaching persistent disks to your cluster.
+Encrypting Data: When you create or attach persistent disks to your GKE cluster, the data stored on these disks will be encrypted using the encryption key you specified. Similarly, when you read data from these disks, it will be automatically decrypted using the same encryption key.
+Key Management: With CMEK, you are responsible for managing the lifecycle of the encryption keys, including rotation, deletion, and access control. This gives you greater control and visibility over the security of your data.
+Enabling CMEK for GKE persistent disks adds an extra layer of security and control to your Kubernetes workloads by allowing you to manage the encryption keys used to protect your data.
+
+User
+Create CMEK in Cloud KMS and assign associated permission for service agent
+########################
+To create a Customer-Managed Encryption Key (CMEK) in Google Cloud Key Management Service (KMS) and assign associated permissions for a service account, you can follow these steps:
+
+Create a Key Ring:
+Go to the Google Cloud Console: https://console.cloud.google.com/.
+Navigate to the "IAM & Admin" > "Crypto keys" page in the left-hand menu.
+Click on the "Create key ring" button.
+Provide a name for your key ring and select the location where you want to create it.
+Click "Create" to create the key ring.
+Create an Encryption Key:
+After creating the key ring, click on the key ring name.
+Click on the "Create key" button.
+Provide a name for your encryption key.
+Select the key ring you created in the previous step.
+Choose the desired key type and key size.
+Click "Create" to create the encryption key.
+Assign Permissions:
+Go to the "IAM & Admin" > "IAM" page in the left-hand menu.
+Find the service account associated with your GKE cluster. This is typically in the format <project-number>-compute@developer.gserviceaccount.com.
+Click on the service account email.
+Click on the "Edit" button at the top of the page.
+Click on "+ Add another role" and select the appropriate roles for accessing the encryption key. For example, you might select the "Cloud KMS CryptoKey Encrypter/Decrypter" role.
+In the "Select a resource" field, enter the name of the key ring or encryption key you created earlier.
+Click "Save" to assign the roles and permissions to the service account.
+By following these steps, you have created a CMEK in Google Cloud KMS and assigned the necessary permissions for a service account, allowing it to encrypt and decrypt data using the encryption key you created.
+
+User
+what does it mean in above context IAM for cloud KMS 
+########################
+In the context of Google Cloud KMS (Key Management Service), IAM (Identity and Access Management) refers to the system used for managing access control and permissions for resources within Google Cloud Platform, including the resources related to Cloud KMS such as key rings and encryption keys.
+
+IAM allows you to control who has access to your resources and what actions they can perform on those resources. This includes granting or revoking permissions for users, groups, and service accounts.
+
+In the context of creating a CMEK in Cloud KMS and assigning associated permissions for a service account:
+
+Creating a CMEK: IAM permissions are used to determine which users or service accounts have the ability to create key rings and encryption keys within Cloud KMS.
+Assigning Permissions: IAM permissions are also used to grant specific roles to users or service accounts, allowing them to perform actions like encrypting or decrypting data using the encryption keys stored in Cloud KMS. This ensures that only authorized entities can access and manipulate the encryption keys and the data they protect.
+Overall, IAM for Cloud KMS provides a robust security mechanism for managing access to encryption keys and ensuring the confidentiality and integrity of your data stored in Google Cloud Platform.

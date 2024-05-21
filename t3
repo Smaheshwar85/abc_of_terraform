@@ -1,0 +1,25 @@
+Description:
+As part of this ticket, we need to create and implement a Customer-Managed Encryption Key (CMEK) for the Google Kubernetes Engine (GKE) cluster. This will ensure that data stored in persistent volumes is encrypted and manage the encryption of Kubernetes secrets and SSL/TLS certificates for secure communication.
+
+Tasks Completed:
+
+Create Key Ring and KMS Key:
+
+Created the key ring and KMS key.
+Utilized the key during the creation of the GKE cluster to ensure that data in persistent volumes is encrypted.
+Manage Kubernetes Secrets:
+
+Determined the approach for managing Kubernetes secrets:
+Decided whether to store secrets in Secret Manager or Vault.
+Ensured that keys are encrypted and stored securely, either in Kubernetes secrets, Secret Manager, or Vault.
+SSL/TLS Certificate Creation:
+
+Outlined the process for creating SSL/TLS certificates for service-to-service communication within the GKE cluster.
+Defined the method for handling incoming requests attempting to access applications deployed in the cluster.
+Acceptance Criteria:
+
+The CMEK key is created and integrated with the GKE cluster, ensuring encryption of data in persistent volumes.
+A clear strategy for managing Kubernetes secrets is documented and implemented, detailing whether secrets are stored in Secret Manager, Vault, or encrypted Kubernetes secrets.
+SSL/TLS certificates are successfully created and configured for secure service-to-service communication and for handling incoming requests to applications in the cluster.
+Documentation covering the CMEK implementation, secret management, and certificate creation process is reviewed and approved by the team.
+Priority: High

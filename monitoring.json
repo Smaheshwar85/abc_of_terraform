@@ -1,0 +1,273 @@
+{
+  "xyChart": {
+    "dataSets": [
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"gce_instance\"",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "groupByFields": [
+                "metric.label.\"severity\""
+              ]
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      }
+    ],
+    "chartOptions": {
+      "mode": "COLOR",
+      "displayHorizontal": false
+    },
+    "thresholds": [],
+    "yAxis": {
+      "scale": "LINEAR"
+    }
+  }
+}
+{
+  "xyChart": {
+    "dataSets": [
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"gce_instance\" metric.label.\"severity\"=monitoring.regex.full_match(\"EMERGENCY|ALERT|CRITICAL|ERROR\")",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_NONE",
+              "groupByFields": []
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      }
+    ],
+    "chartOptions": {
+      "mode": "COLOR",
+      "displayHorizontal": false
+    },
+    "thresholds": [],
+    "yAxis": {
+      "scale": "LINEAR"
+    }
+  }
+}
+{
+  "xyChart": {
+    "dataSets": [
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"k8s_cluster\"",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "groupByFields": [
+                "metric.label.\"severity\""
+              ]
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      }
+    ],
+    "chartOptions": {
+      "mode": "COLOR",
+      "displayHorizontal": false
+    },
+    "thresholds": [],
+    "yAxis": {
+      "scale": "LINEAR"
+    }
+  }
+}
+
+{
+  "xyChart": {
+    "dataSets": [
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"k8s_cluster\" metric.label.\"severity\"=monitoring.regex.full_match(\"EMERGENCY|ALERT|CRITICAL|ERROR\")",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_NONE",
+              "groupByFields": []
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      }
+    ],
+    "chartOptions": {
+      "mode": "COLOR",
+      "displayHorizontal": false
+    },
+    "thresholds": [],
+    "yAxis": {
+      "scale": "LINEAR"
+    }
+  }
+}
+{
+  "xyChart": {
+    "dataSets": [
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"https_lb_rule\"",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "groupByFields": [
+                "metric.label.\"severity\""
+              ]
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      },
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"l7_lb_rule\"",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "groupByFields": [
+                "metric.label.\"severity\""
+              ]
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      }
+    ],
+    "chartOptions": {
+      "mode": "COLOR",
+      "displayHorizontal": false
+    },
+    "thresholds": [],
+    "yAxis": {
+      "scale": "LINEAR"
+    }
+  }
+}
+{
+  "xyChart": {
+    "dataSets": [
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"https_lb_rule\" metric.label.\"severity\"=monitoring.regex.full_match(\"EMERGENCY|ALERT|CRITICAL|ERROR\")",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_NONE",
+              "groupByFields": []
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      },
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"l7_lb_rule\" metric.label.\"severity\"=monitoring.regex.full_match(\"EMERGENCY|ALERT|CRITICAL|ERROR\")",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_NONE",
+              "groupByFields": []
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      }
+    ],
+    "chartOptions": {
+      "mode": "COLOR",
+      "displayHorizontal": false
+    },
+    "thresholds": [],
+    "yAxis": {
+      "scale": "LINEAR"
+    }
+  }
+}
+{
+  "xyChart": {
+    "dataSets": [
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"bigquery_project\"",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_SUM",
+              "groupByFields": [
+                "metric.label.\"severity\""
+              ]
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      }
+    ],
+    "chartOptions": {
+      "mode": "COLOR",
+      "displayHorizontal": false
+    },
+    "thresholds": [],
+    "yAxis": {
+      "scale": "LINEAR"
+    }
+  }
+}
+{
+  "xyChart": {
+    "dataSets": [
+      {
+        "timeSeriesQuery": {
+          "timeSeriesFilter": {
+            "filter": "metric.type=\"logging.googleapis.com/log_entry_count\" resource.type=\"bigquery_project\" metric.label.\"severity\"=monitoring.regex.full_match(\"EMERGENCY|ALERT|CRITICAL|ERROR\")",
+            "aggregation": {
+              "perSeriesAligner": "ALIGN_DELTA",
+              "crossSeriesReducer": "REDUCE_NONE",
+              "groupByFields": []
+            }
+          }
+        },
+        "plotType": "STACKED_BAR",
+        "targetAxis": "Y1",
+        "minAlignmentPeriod": "60s"
+      }
+    ],
+    "chartOptions": {
+      "mode": "COLOR",
+      "displayHorizontal": false
+    },
+    "thresholds": [],
+    "yAxis": {
+      "scale": "LINEAR"
+    }
+  }
+}

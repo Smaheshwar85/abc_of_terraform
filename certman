@@ -1,4 +1,17 @@
-eploying a Helm chart using Terraform involves using the Terraform Helm provider. This provider allows you to manage Helm charts using Terraform configuration files. Below are the steps to achieve this:
+# Ensure Helm is installed
+helm version
+
+# Add the Jetstack Helm repository
+helm repo add jetstack https://charts.jetstack.io
+
+# Update Helm repositories
+helm repo update
+
+# Install Cert Manager CRDs
+kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
+
+# Install Cert Manager using Helm
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespaceeploying a Helm chart using Terraform involves using the Terraform Helm provider. This provider allows you to manage Helm charts using Terraform configuration files. Below are the steps to achieve this:
 1.	Install Terraform and Helm: Ensure you have both Terraform and Helm installed on your system.
 2.	Configure Terraform provider for Helm: Use the Terraform Helm provider in your Terraform configuration.
 3.	Define Kubernetes provider: You also need to configure the Kubernetes provider to interact with your Kubernetes cluster.

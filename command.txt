@@ -1,3 +1,185 @@
 terraform apply -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec1.tfvars"
 
 terraform plan -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec2.tfvars"
+
+To meet your requirements, we need to create a Terraform module that sets up the logging configuration, including the log bucket, log sink, service account, and appropriate IAM roles. Here’s a step-by-step solution that incorporates RBAC and least privilege concepts:
+
+### Terraform Module: `logging`
+
+First, let's create a `logging` module that includes all the necessary configurations.
+
+#### Directory Structure
+```
+modules/
+  logging/
+    main.tf
+    variables.tf
+    outputs.tf
+    README.md
+```
+
+#### `modules/logging/main.tf`
+```hcl
+# Central Project Resources
+
+# Log Bucket in Central Project
+resource "google_logging_project_bucket_config" "log_bucket" {
+  provider = google.central
+  bucket_id = var.log_bucket_id
+  location = "global"
+  retention_days = var.retention_days
+}
+
+# User-Managed Service Account
+resource "google_service_account" "logging_sa" {
+  provider = google.central
+  account_id = "logging-sink"
+  display_name = "Logging Sink Service Account"
+}
+
+# Grant Service Account Permission to Write to Log Bucket
+resource "google_project_iam_binding" "central_log_bucket_writer_binding" {
+  provider = google.central
+  project = var.central_project_id
+  role = "roles/logging.bucketWriter"
+  members = [
+    "serviceAccount:${google_service_account.logging_sa.email}"
+  ]
+}
+
+# Grant Viewer Role to Developers
+resource "google_project_iam_binding" "log_bucket_viewer_binding" {
+  provider = google.central
+  project = var.central_project_id
+  role = "roles/viewer"
+  members = var.developer_emails
+}
+
+# Grant Owner Role to SRE Team
+resource "google_project_iam_binding" "log_bucket_owner_binding" {
+  provider = google.central
+  project = var.central_project_id
+  role = "roles/owner"
+  members = var.sre_team_emails
+}
+
+# Source Project Resources
+
+# Log Sink in Source Project
+resource "google_logging_project_sink" "log_sink" {
+  provider = google.source
+  name = "central-log-sink"
+  destination = "logging.googleapis.com/projects/${var.central_project_id}/locations/global/buckets/${var.log_bucket_id}"
+  filter = "logName:projects/${var.source_project_id}/logs/"
+  writer_identity = "serviceAccount:${google_service_account.logging_sa.email}"
+}
+
+# Grant Log Sink Service Account Permission to Write Logs in Source Project
+resource "google_project_iam_binding" "sink_writer_member" {
+  provider = google.source
+  project = var.source_project_id
+  role = "roles/logging.logWriter"
+  members = [
+    "serviceAccount:${google_service_account.logging_sa.email}"
+  ]
+}
+```
+
+#### `modules/logging/variables.tf`
+```hcl
+variable "central_project_id" {
+  description = "ID of the central project where the log bucket is created"
+  type = string
+}
+
+variable "source_project_id" {
+  description = "ID of the source project where the application is running"
+  type = string
+}
+
+variable "log_bucket_id" {
+  description = "ID of the log bucket"
+  type = string
+}
+
+variable "retention_days" {
+  description = "Retention period for the log bucket"
+  type = number
+  default = 30
+}
+
+variable "developer_emails" {
+  description = "List of developer emails to grant viewer access"
+  type = list(string)
+}
+
+variable "sre_team_emails" {
+  description = "List of SRE team emails to grant owner access"
+  type = list(string)
+}
+```
+
+#### `modules/logging/outputs.tf`
+```hcl
+output "service_account_email" {
+  value = google_service_account.logging_sa.email
+}
+
+output "log_bucket_name" {
+  value = google_logging_project_bucket_config.log_bucket.bucket_id
+}
+
+output "log_sink_name" {
+  value = google_logging_project_sink.log_sink.name
+}
+```
+
+### Using the Logging Module
+
+Now, let’s create the root module to use the `logging` module.
+
+#### `main.tf`
+```hcl
+provider "google" {
+  project = "central-project-id"
+  region = "us-central1"
+  alias = "central"
+}
+
+provider "google" {
+  project = "source-project-id"
+  region = "us-central1"
+  alias = "source"
+}
+
+module "logging" {
+  source = "./modules/logging"
+
+  central_project_id = "central-project-id"
+  source_project_id  = "source-project-id"
+  log_bucket_id      = "central-log-bucket"
+  retention_days     = 30
+
+  developer_emails = [
+    "developer1@example.com",
+    "developer2@example.com"
+  ]
+
+  sre_team_emails = [
+    "sre1@example.com",
+    "sre2@example.com"
+  ]
+}
+```
+
+### Explanation
+
+1. **Providers**: The root module sets up the providers for both the central and source projects.
+2. **Logging Module**:
+    - **Log Bucket**: Creates a log bucket in the central project.
+    - **Service Account**: Creates a user-managed service account in the central project.
+    - **IAM Bindings**: Grants the service account `roles/logging.bucketWriter` on the log bucket, developers `roles/viewer`, and SRE team `roles/owner`.
+    - **Log Sink**: Creates a log sink in the source project, pointing to the log bucket in the central project and using the created service account for writer identity.
+    - **Log Writer Role**: Grants the service account `roles/logging.logWriter` in the source project to write logs.
+
+This setup ensures that logs from the source project are routed to the central log bucket using a user-managed service account, with appropriate RBAC for developers and SRE teams.

@@ -628,7 +628,145 @@ kubectl get namespace cert-manager
 •	Ensure the cert-manager namespace is created.
 •	Check the Cert-Manager Pods:
 kubectl get pods -n cert-manager
+To create a production-ready Terraform configuration for setting up centralized logging on Google Cloud Platform (GCP) with a user-managed service account, you'll need to:
 
+1. Create a log bucket in the central project.
+2. Create a user-managed service account with appropriate permissions.
+3. Set up log sinks in the source projects to route logs to the central log bucket.
+4. Use the service account in the log sinks.
+
+Here is the Terraform code to achieve this:
+
+### Step 1: Create Log Bucket in Central Project
+
+```hcl
+provider "google" {
+  project = "central-project-id"
+  region  = "us-central1"
+}
+
+resource "google_logging_project_bucket_config" "log_bucket" {
+  bucket_id = "central-log-bucket"
+  location  = "global"
+  retention_days = 30
+}
+```
+
+### Step 2: Create User-Managed Service Account
+
+```hcl
+resource "google_service_account" "logging_sa" {
+  account_id   = "logging-sink"
+  display_name = "Logging Sink Service Account"
+}
+
+resource "google_project_iam_member" "log_writer" {
+  project = "central-project-id"
+  role    = "roles/logging.bucketWriter"
+  member  = "serviceAccount:${google_service_account.logging_sa.email}"
+}
+```
+
+### Step 3: Configure Log Sink in Source Projects
+
+```hcl
+provider "google" {
+  project = "source-project-id"
+  region  = "us-central1"
+}
+
+resource "google_logging_project_sink" "log_sink" {
+  name        = "central-log-sink"
+  destination = "logging.googleapis.com/projects/central-project-id/locations/global/buckets/central-log-bucket"
+  filter      = "logName:projects/source-project-id/logs/"
+  writer_identity = "serviceAccount:${google_service_account.logging_sa.email}"
+}
+
+resource "google_project_iam_member" "sink_writer" {
+  project = "source-project-id"
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_logging_project_sink.log_sink.writer_identity}"
+}
+```
+
+### Step 4: Grant Service Account Permissions to Write Logs
+
+```hcl
+resource "google_project_iam_member" "central_log_bucket_writer" {
+  project = "central-project-id"
+  role    = "roles/logging.bucketWriter"
+  member  = "serviceAccount:${google_service_account.logging_sa.email}"
+}
+```
+
+### Full Terraform Configuration
+
+Combine all the steps above into a single Terraform configuration. Here is how it looks:
+
+```hcl
+# Define providers for both central and source projects
+provider "google" {
+  project = "central-project-id"
+  region  = "us-central1"
+  alias   = "central"
+}
+
+provider "google" {
+  project = "source-project-id"
+  region  = "us-central1"
+  alias   = "source"
+}
+
+# Create Log Bucket in Central Project
+resource "google_logging_project_bucket_config" "log_bucket" {
+  provider    = google.central
+  bucket_id   = "central-log-bucket"
+  location    = "global"
+  retention_days = 30
+}
+
+# Create User-Managed Service Account
+resource "google_service_account" "logging_sa" {
+  provider    = google.central
+  account_id   = "logging-sink"
+  display_name = "Logging Sink Service Account"
+}
+
+# Grant Service Account Permission to Write to Log Bucket
+resource "google_project_iam_member" "central_log_bucket_writer" {
+  provider = google.central
+  project = "central-project-id"
+  role    = "roles/logging.bucketWriter"
+  member  = "serviceAccount:${google_service_account.logging_sa.email}"
+}
+
+# Configure Log Sink in Source Project
+resource "google_logging_project_sink" "log_sink" {
+  provider    = google.source
+  name        = "central-log-sink"
+  destination = "logging.googleapis.com/projects/central-project-id/locations/global/buckets/central-log-bucket"
+  filter      = "logName:projects/source-project-id/logs/"
+  writer_identity = "serviceAccount:${google_service_account.logging_sa.email}"
+}
+
+# Grant Log Sink Service Account Permission to Write Logs in Source Project
+resource "google_project_iam_member" "sink_writer" {
+  provider = google.source
+  project = "source-project-id"
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_logging_project_sink.log_sink.writer_identity}"
+}
+```
+
+### Explanation
+
+- **Providers**: Defined for both central and source projects to manage resources in multiple projects.
+- **Log Bucket**: Created in the central project with a defined retention period.
+- **Service Account**: User-managed service account with `roles/logging.bucketWriter` role in the central project.
+- **Log Sink**: Created in the source project with the destination set to the log bucket in the central project.
+- **IAM Roles**: Ensured the service account has the necessary permissions to write logs.
+
+This configuration is scalable and can be used to add more source projects by replicating the source project configurations.
 
 •	You should see the Cert-Manager pods running.
 •	Check the Issuer:

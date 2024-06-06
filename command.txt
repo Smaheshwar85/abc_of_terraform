@@ -1,3 +1,168 @@
+@@@@@@@@@@@@@
+I apologize for the oversight. To include `google_project_iam_member` in the implementation, we will update the Terraform module to use both `google_project_iam_binding` for bulk role assignments and `google_project_iam_member` for specific roles where necessary.
+
+Here’s how you can update the module and usage examples to incorporate both `google_project_iam_binding` and `google_project_iam_member`.
+
+### Updated Terraform Module: `logging`
+
+#### `modules/logging/main.tf`
+```hcl
+# Central Project Resources
+
+resource "google_logging_project_bucket_config" "log_bucket" {
+  provider = google.central
+  bucket_id = var.log_bucket_id
+  location = "global"
+  retention_days = var.retention_days
+}
+
+resource "google_service_account" "logging_sa" {
+  provider = google.central
+  account_id = "logging-sink"
+  display_name = "Logging Sink Service Account"
+}
+
+resource "google_project_iam_binding" "central_log_bucket_writer_binding" {
+  provider = google.central
+  project = var.central_project_id
+  role = "roles/logging.bucketWriter"
+  members = [
+    "serviceAccount:${google_service_account.logging_sa.email}"
+  ]
+}
+
+resource "google_project_iam_member" "developer_log_bucket_viewer" {
+  provider = google.central
+  for_each = toset(var.developer_emails)
+  project = var.central_project_id
+  role = "roles/viewer"
+  member = "user:${each.value}"
+}
+
+resource "google_project_iam_member" "sre_log_bucket_owner" {
+  provider = google.central
+  for_each = toset(var.sre_team_emails)
+  project = var.central_project_id
+  role = "roles/owner"
+  member = "user:${each.value}"
+}
+
+# Source Project Resources
+
+resource "google_logging_project_sink" "log_sink" {
+  provider = google.source
+  name = "central-log-sink"
+  destination = "logging.googleapis.com/projects/${var.central_project_id}/locations/global/buckets/${var.log_bucket_id}"
+  filter = "logName:projects/${var.source_project_id}/logs/"
+  writer_identity = "serviceAccount:${google_service_account.logging_sa.email}"
+}
+
+resource "google_project_iam_member" "sink_writer_member" {
+  provider = google.source
+  project = var.source_project_id
+  role = "roles/logging.logWriter"
+  member = "serviceAccount:${google_service_account.logging_sa.email}"
+}
+```
+
+### Updated Usage of the Logging Module
+
+#### `main.tf`
+```hcl
+provider "google" {
+  project = "central-project-id"
+  region = "us-central1"
+  alias = "central"
+}
+
+provider "google" {
+  project = "source-project-id"
+  region = "us-central1"
+  alias = "source"
+}
+
+module "logging" {
+  source = "./modules/logging"
+
+  central_project_id = "central-project-id"
+  source_project_id  = "source-project-id"
+  log_bucket_id      = "central-log-bucket"
+  retention_days     = 30
+
+  developer_emails = [
+    "developer1@example.com",
+    "developer2@example.com"
+  ]
+
+  sre_team_emails = [
+    "sre1@example.com",
+    "sre2@example.com"
+  ]
+}
+```
+
+### Complete Example of the Updated Module Files
+
+#### `modules/logging/variables.tf`
+```hcl
+variable "central_project_id" {
+  description = "ID of the central project where the log bucket is created"
+  type = string
+}
+
+variable "source_project_id" {
+  description = "ID of the source project where the application is running"
+  type = string
+}
+
+variable "log_bucket_id" {
+  description = "ID of the log bucket"
+  type = string
+}
+
+variable "retention_days" {
+  description = "Retention period for the log bucket"
+  type = number
+  default = 30
+}
+
+variable "developer_emails" {
+  description = "List of developer emails to grant viewer access"
+  type = list(string)
+}
+
+variable "sre_team_emails" {
+  description = "List of SRE team emails to grant owner access"
+  type = list(string)
+}
+```
+
+#### `modules/logging/outputs.tf`
+```hcl
+output "service_account_email" {
+  value = google_service_account.logging_sa.email
+}
+
+output "log_bucket_name" {
+  value = google_logging_project_bucket_config.log_bucket.bucket_id
+}
+
+output "log_sink_name" {
+  value = google_logging_project_sink.log_sink.name
+}
+```
+
+### Explanation of the Updates
+
+- **`google_project_iam_member`**:
+  - Used for granting individual roles to each developer and SRE team member.
+  - Iterates over the lists `developer_emails` and `sre_team_emails` using `for_each` to assign `roles/viewer` and `roles/owner` respectively.
+
+- **`google_project_iam_binding`**:
+  - Used for assigning `roles/logging.bucketWriter` to the service account for bulk binding.
+
+This configuration now includes both `google_project_iam_binding` and `google_project_iam_member`, ensuring that the service account, developers, and SRE teams have the appropriate access levels.
+@@@@@@@@@@@@@@@@
 terraform apply -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec1.tfvars"
 
 terraform plan -var-file="C:\tf-workspace\terraform-logging-project -examples\project-configs\projec2.tfvars"

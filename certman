@@ -1,4 +1,179 @@
-# Ensure Helm is installed
+Controlling ingress for your data application in GCP, which involves BigQuery, Datastream, and Dataproc, requires configuring network and security settings to ensure that only authorized traffic can access your resources. Here are different scenarios with solutions:
+
+### Scenario 1: Controlling Ingress to Dataproc Clusters
+
+**Solution:**
+
+1. **Private IP and VPC Peering**:
+   - Use private IP addresses for your Dataproc cluster to prevent direct internet access.
+   - Set up VPC peering to connect your VPC network with other networks securely.
+
+2. **Firewall Rules**:
+   - Create firewall rules to allow ingress traffic only from specific IP ranges or VPCs.
+   - Example: Allow traffic from a trusted IP range or another VPC where your Datastream and BigQuery are located.
+
+   ```bash
+   gcloud compute firewall-rules create allow-internal-dataproc \
+       --network my-vpc \
+       --allow tcp,udp,icmp \
+       --source-ranges 10.0.0.0/16 \
+       --target-tags dataproc-cluster
+   ```
+
+3. **IAM Policies**:
+   - Use IAM roles and policies to restrict access to Dataproc APIs and resources.
+   - Ensure only authorized users or service accounts can create or interact with Dataproc clusters.
+
+### Scenario 2: Securing Ingress to Datastream
+
+**Solution:**
+
+1. **VPC Network Configuration**:
+   - Place your Datastream resources in a private subnet within your VPC to limit exposure.
+   - Use Private Google Access for your Datastream resources to access Google APIs securely.
+
+2. **Firewall Rules**:
+   - Create firewall rules to restrict ingress traffic to Datastream from specific IP ranges or VPC networks.
+   - Example: Allow traffic only from the IP range of your application servers or data sources.
+
+   ```bash
+   gcloud compute firewall-rules create allow-internal-datastream \
+       --network my-vpc \
+       --allow tcp:3306 \
+       --source-ranges 10.0.1.0/24 \
+       --target-tags datastream
+   ```
+
+3. **IP Allowlist**:
+   - Configure IP allowlists for Datastream to restrict which IP addresses can interact with it.
+   - Ensure that only trusted IP addresses or networks are allowed.
+
+### Scenario 3: Controlling Access to BigQuery
+
+**Solution:**
+
+1. **Private Google Access**:
+   - Use Private Google Access to enable instances in your VPC to access BigQuery securely without exposing traffic to the internet.
+
+2. **VPC Service Controls**:
+   - Implement VPC Service Controls to create a security perimeter around BigQuery and other GCP services.
+   - Configure access levels and policies to control which IP ranges or networks can access BigQuery.
+
+   ```bash
+   gcloud access-context-manager perimeters create bigquery-perimeter \
+       --title="BigQuery Perimeter" \
+       --resources=projects/my-project \
+       --restricted-services=bigquery.googleapis.com
+   ```
+
+3. **IAM Policies**:
+   - Use IAM policies to control who can query, view, or manage BigQuery datasets.
+   - Assign roles like `bigquery.dataViewer`, `bigquery.dataEditor`, and `bigquery.admin` judiciously.
+
+### Scenario 4: Integrating Dataproc, Datastream, and BigQuery Securely
+
+**Solution:**
+
+1. **Shared VPC**:
+   - Use a Shared VPC to host your Dataproc, Datastream, and BigQuery resources in different projects but within the same network.
+   - Ensure proper network segmentation and firewall rules are in place.
+
+2. **Service Accounts and IAM**:
+   - Create service accounts with minimal required permissions for Dataproc, Datastream, and BigQuery.
+   - Use these service accounts to authenticate and authorize interactions between services.
+
+3. **Firewall and Network Tags**:
+   - Apply network tags to instances and create firewall rules to allow traffic only between services with specific tags.
+   - Example: Allow Dataproc instances to communicate with Datastream and BigQuery through specific firewall rules.
+
+   ```bash
+   gcloud compute firewall-rules create allow-dataproc-datastream \
+       --network my-vpc \
+       --allow tcp:443 \
+       --source-tags dataproc \
+       --target-tags datastream
+   ```
+
+4. **VPC Service Controls**:
+   - Extend VPC Service Controls to include all relevant services.
+   - Configure access levels to allow only approved ingress and egress traffic within the security perimeter.
+
+   ```bash
+   gcloud access-context-manager perimeters update bigquery-perimeter \
+       --title="Extended Perimeter" \
+       --resources=projects/my-project,projects/another-project \
+       --restricted-services=bigquery.googleapis.com,dataproc.googleapis.com,datastream.googleapis.com
+   ```
+
+By implementing these solutions, you can effectively control ingress to your GCP data applications, ensuring that only authorized traffic can access your Dataproc clusters, Datastream services, and BigQuery datasets.
+
+
+In Google Cloud Platform (GCP), internet ingress refers to the incoming network traffic from the internet to your GCP resources. This involves configuring your cloud environment to accept and properly route external requests to the appropriate resources such as virtual machines, cloud storage, or managed services.
+
+Here are key steps and concepts to manage internet ingress in GCP:
+
+1. **VPC Network**:
+   - Create a Virtual Private Cloud (VPC) network to host your resources.
+   - Define subnets within the VPC network.
+
+2. **Firewall Rules**:
+   - Configure firewall rules to allow incoming traffic. By default, all incoming traffic is blocked.
+   - Create a firewall rule to allow ingress traffic from the internet on specific ports (e.g., TCP port 80 for HTTP, TCP port 443 for HTTPS).
+
+3. **External IP Addresses**:
+   - Assign an external IP address to your VM instances or other resources to make them accessible from the internet.
+   - Static or ephemeral external IPs can be used.
+
+4. **Load Balancing**:
+   - Use a load balancer to distribute incoming traffic across multiple instances.
+   - HTTP(S) Load Balancers, TCP/UDP Load Balancers, and SSL Proxy Load Balancers are common choices.
+   - Configure the backend service, URL maps, and health checks.
+
+5. **Cloud CDN**:
+   - Enable Cloud CDN to cache and deliver content closer to users, reducing latency.
+   - Integrate with HTTP(S) Load Balancer.
+
+6. **Cloud Armor**:
+   - Use Cloud Armor to protect your applications from DDoS attacks and other web threats.
+   - Create security policies and rules to filter traffic.
+
+7. **Domain and DNS**:
+   - Use Cloud DNS to manage your domain names and DNS records.
+   - Point your domain to the external IP addresses or load balancers.
+
+### Example Scenario: Setting Up an HTTP(S) Load Balancer
+
+1. **Create a VPC Network**:
+   - Navigate to the VPC network section in the GCP Console.
+   - Create a new VPC network and define the necessary subnets.
+
+2. **Create VM Instances**:
+   - Deploy VM instances in the subnets created.
+   - Ensure they have necessary applications/services installed (e.g., a web server).
+
+3. **Set Up Firewall Rules**:
+   - Go to the VPC network section and create a new firewall rule.
+   - Allow ingress traffic on TCP port 80 and 443.
+
+4. **Reserve an External IP Address**:
+   - Reserve a static external IP address for your load balancer.
+
+5. **Configure HTTP(S) Load Balancer**:
+   - Create a backend service and add your VM instances.
+   - Set up URL maps to route incoming requests to the backend service.
+   - Configure health checks to ensure instances are healthy.
+
+6. **Configure Frontend and Obtain IP Address**:
+   - Set up the frontend configuration with the reserved external IP.
+   - Create an A record in Cloud DNS pointing to the external IP address.
+
+7. **Enable Cloud CDN (Optional)**:
+   - Enable Cloud CDN to cache content and improve delivery performance.
+
+8. **Set Up Cloud Armor (Optional)**:
+   - Create security policies in Cloud Armor to protect against threats.
+
+By following these steps, you can effectively manage internet ingress to your GCP resources, ensuring they are accessible, scalable, and secure.# Ensure Helm is installed
 helm version
 
 # Add the Jetstack Helm repository

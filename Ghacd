@@ -1,5 +1,236 @@
 Below is a comprehensive, production-ready Terraform script to set up a log sink with a user-managed service account, considering best practices such as managing state, using modules, and defining necessary IAM roles and policies.
+eHere is the revised, production-ready Terraform code using `google_service_account` and `google_project_iam_binding` resources to set up a log sink with a user-managed service account:
 
+### Main Configuration (`main.tf`)
+
+```hcl
+terraform {
+  required_version = ">= 1.0.0"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 4.0"
+    }
+  }
+}
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+module "log_sink_setup" {
+  source = "./modules/log_sink_setup"
+
+  destination_project_id = var.destination_project_id
+  custom_sa_project_id   = var.custom_sa_project_id
+  sink_project_id        = var.sink_project_id
+  custom_sa_name         = var.custom_sa_name
+  bucket_name            = var.bucket_name
+  location               = var.location
+  user_email             = var.user_email
+}
+```
+
+### Variables Definition (`variables.tf`)
+
+```hcl
+variable "project_id" {
+  description = "The ID of the project where Terraform is executed"
+  type        = string
+}
+
+variable "region" {
+  description = "The region for Google Cloud resources"
+  type        = string
+}
+
+variable "destination_project_id" {
+  description = "The project ID of the project that contains your log bucket"
+  type        = string
+}
+
+variable "custom_sa_project_id" {
+  description = "The project ID of the project that contains your user-managed service account"
+  type        = string
+}
+
+variable "sink_project_id" {
+  description = "The project ID of the project where you plan to create the log sink"
+  type        = string
+}
+
+variable "custom_sa_name" {
+  description = "The name of your user-managed service account"
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "The name of your log bucket"
+  type        = string
+}
+
+variable "location" {
+  description = "The location of your log bucket"
+  type        = string
+}
+
+variable "user_email" {
+  description = "The email of the user creating the log sinks"
+  type        = string
+}
+```
+
+### Outputs (`outputs.tf`)
+
+```hcl
+output "log_sink_writer_identity" {
+  value = module.log_sink_setup.log_sink_writer_identity
+}
+```
+
+### Module Configuration (`modules/log_sink_setup/main.tf`)
+
+```hcl
+variable "destination_project_id" {}
+variable "custom_sa_project_id" {}
+variable "sink_project_id" {}
+variable "custom_sa_name" {}
+variable "bucket_name" {}
+variable "location" {}
+variable "user_email" {}
+
+# Create a user-managed service account
+resource "google_service_account" "custom_sa" {
+  account_id   = var.custom_sa_name
+  project      = var.custom_sa_project_id
+  display_name = "Custom Service Account for Log Sinks"
+}
+
+# Get the default logging service account
+data "google_logging_project_settings" "logging_settings" {
+  project = var.sink_project_id
+}
+
+# Grant Logs Bucket Writer role to the custom service account
+resource "google_project_iam_binding" "logs_bucket_writer" {
+  project = var.destination_project_id
+  role    = "roles/logging.bucketWriter"
+
+  members = [
+    "serviceAccount:${google_service_account.custom_sa.email}",
+  ]
+}
+
+# Grant Service Account Token Creator role to the logging service account on the custom service account
+resource "google_service_account_iam_binding" "sa_token_creator" {
+  service_account_id = google_service_account.custom_sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+
+  members = [
+    "serviceAccount:${data.google_logging_project_settings.logging_settings.logging_service_account_id}",
+  ]
+}
+
+# Grant Service Account User role to the user creating the log sinks
+resource "google_service_account_iam_binding" "sa_user" {
+  service_account_id = google_service_account.custom_sa.name
+  role               = "roles/iam.serviceAccountUser"
+
+  members = [
+    "user:${var.user_email}",
+  ]
+}
+
+# Disable cross-project service account usage constraint
+resource "google_organization_policy" "disable_cross_project_sa_usage" {
+  constraint = "constraints/iam.disableCrossProjectServiceAccountUsage"
+  org_id     = var.custom_sa_project_id
+
+  policy {
+    version = 1
+
+    bindings {
+      role = "roles/owner"
+      members = [
+        "user:${var.user_email}",
+      ]
+    }
+
+    audit_log_configs {
+      log_type = "DATA_READ"
+    }
+  }
+}
+
+# Create the log sink
+resource "google_logging_sink" "log_sink" {
+  name        = "example-log-sink"
+  destination = "logging.googleapis.com/projects/${var.destination_project_id}/locations/${var.location}/buckets/${var.bucket_name}"
+
+  filter = "severity>=ERROR"
+
+  writer_identity = "serviceAccount:${google_service_account.custom_sa.email}"
+}
+
+output "log_sink_writer_identity" {
+  value = google_logging_sink.log_sink.writer_identity
+}
+```
+
+### Module Variables (`modules/log_sink_setup/variables.tf`)
+
+```hcl
+variable "destination_project_id" {
+  description = "The project ID of the project that contains your log bucket"
+  type        = string
+}
+
+variable "custom_sa_project_id" {
+  description = "The project ID of the project that contains your user-managed service account"
+  type        = string
+}
+
+variable "sink_project_id" {
+  description = "The project ID of the project where you plan to create the log sink"
+  type        = string
+}
+
+variable "custom_sa_name" {
+  description = "The name of your user-managed service account"
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "The name of your log bucket"
+  type        = string
+}
+
+variable "location" {
+  description = "The location of your log bucket"
+  type        = string
+}
+
+variable "user_email" {
+  description = "The email of the user creating the log sinks"
+  type        = string
+}
+```
+
+### Explanation
+
+1. **Provider and Variables Setup**: Configures Google Cloud provider and variables.
+2. **Module Usage**: Uses a module to encapsulate the log sink setup.
+3. **Service Account Creation**: Creates a user-managed service account.
+4. **IAM Binding**:
+   - `google_project_iam_binding` grants the `roles/logging.bucketWriter` role to the custom service account.
+   - `google_service_account_iam_binding` grants `roles/iam.serviceAccountTokenCreator` to the logging service account on the custom service account.
+   - `google_service_account_iam_binding` grants `roles/iam.serviceAccountUser` to the user creating the log sinks.
+5. **Organization Policy**: Disables cross-project service account usage constraint.
+6. **Logging Sink Configuration**: Sets up the logging sink with appropriate configurations.
+7. **Outputs**: Exports the writer identity of the log sink.
+
+This script follows best practices and leverages Terraform's capabilities to manage resources and IAM policies efficiently.
 ### Main Configuration (`main.tf`)
 
 ```hcl

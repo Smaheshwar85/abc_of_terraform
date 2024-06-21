@@ -1,0 +1,18 @@
+Writing Terraform Code for Infrastructure:
+
+Develop Terraform scripts to define, provision, and manage reproducible cloud infrastructure.
+Conducting Proof of Concepts (PoCs) for Choosing the Right Solutions:
+
+Perform PoCs to evaluate tools, services, and technologies for optimal system fit.
+Discovering Various Options for the System:
+
+Continuously research and compare technologies to find the best system solutions.
+Defining Proper Backup and Proactive Incident Handling:
+
+Create backup strategies and proactive incident response plans for data integrity and availability.
+Contributing to Various Design Aspects:
+
+Design network ingress, set up GCP projects, define deployment strategies, and manage secrets securely.
+Central vs. Application-Specific Resource Management:
+
+Identify and manage centralized and application-specific resources for optimal performance and security.

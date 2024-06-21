@@ -16,3 +16,26 @@ Design network ingress, set up GCP projects, define deployment strategies, and m
 Central vs. Application-Specific Resource Management:
 
 Identify and manage centralized and application-specific resources for optimal performance and security.
+
+
+
+vProfessional Experiences:
+Successfully led data and application migrations from on-premises to Google Cloud for retail and finance domain projects.
+Designed data lakes and data warehouse solutions to meet complex business requirements, including revenue generation models like DataHub.
+Developed ETL pipelines using Apache Airflow for data ingestion and processing.
+Crafted CI/CD pipelines for container deployment with Kubernetes and Docker, orchestrating containerized environments.
+Developed automated tools using Talend and Ansible for streamlining day-to-day production activities.
+Method Skills:
+Google Cloud Services: Extensive expertise in Dataflow, DataProc, BigQuery, Pub/Sub, Cloud IAM, GKE, Cloud Composer, and others.
+Programming: Writing Spark jobs for handling large datasets securely and efficiently; Java Dataflow code for transforming and ingesting data into BigQuery.
+Cloud Optimization: Expertise in optimizing cloud costs and deploying end-to-end data pipelines securely.
+DevOps Tools: Proficient in Jenkins, Terraform, Ansible, SonarQube, Maven, and Git.
+Containerization: Hands-on experience with Kubernetes orchestration and microservices development.
+Monitoring and Logging: Using APM tools like Dynatrace and log management with Splunk to ensure optimal system performance.
+Soft Skills:
+Demonstrated excellent capabilities in understanding and aligning technical solutions with business processes and functional requirements.
+
+
+
+
+

@@ -848,7 +848,412 @@ vpc_connector_name = "vpc-connector-name"
 Environment: Production
 The production environment setup (main.tf and prod.tfvars) remains similar to the development environment, with appropriate values adjusted for production use.
 
-This structure should now work without any errors, keeping the storage-related code inside the cloudresources folder and configuring it accordingly. Adjust paths and module sources as per your actual setup and directory structure in your Terraform configuration.
+This structure should now work without any errors, keeping the storage-related code inside the cloudresources folder and configuring it accordingly. Adjust paths and module sources as per your actu
+al setup and directory structure in your Terraform configuration.
+
+
+
+
+==================================================================================================================================================================================================================
+
+
+*****************************************************************************************************************************************************************************************
+===============================================================================================================================================================================================================
+
+
+Module: Storage
+modules/cloudresources/storage/main.tf
+
+hcl
+Copy code
+resource "google_storage_bucket" "main" {
+  name     = var.bucket_name
+  location = var.region
+  uniform_bucket_level_access = true
+
+  encryption {
+    default_kms_key_name = var.kms_key_name
+  }
+}
+
+resource "google_storage_bucket_object" "main" {
+  name    = "config.yaml"
+  content = var.config_content
+  bucket  = google_storage_bucket.main.name
+}
+modules/cloudresources/storage/variables.tf
+
+hcl
+Copy code
+variable "bucket_name" {
+  description = "The name of the GCS bucket."
+  type        = string
+}
+
+variable "region" {
+  description = "The region for the GCS bucket."
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name used for encryption."
+  type        = string
+}
+
+variable "config_content" {
+  description = "Content for the config file."
+  type        = string
+}
+Module: Pub/Sub
+modules/cloudresources/pubsub/main.tf
+
+hcl
+Copy code
+resource "google_pubsub_topic" "main" {
+  name            = var.name
+  kms_key_name    = var.kms_key_name
+  message_storage_policy {
+    allowed_persistence_regions = [var.region]
+  }
+}
+
+resource "google_pubsub_subscription" "main" {
+  name                    = var.name
+  topic                   = google_pubsub_topic.main.name
+  ack_deadline_seconds    = 20
+  message_retention_duration = "3600s"
+}
+
+resource "google_pubsub_subscription_iam_member" "cloudrun" {
+  subscription = google_pubsub_subscription.main.id
+  member       = "serviceAccount:${var.service_account_email}"
+  role         = "roles/pubsub.subscriber"
+}
+
+resource "google_pubsub_topic_iam_member" "sink" {
+  topic  = google_pubsub_topic.main.id
+  member = "serviceAccount:service-${var.project_number}@gcp-sa-logging.iam.gserviceaccount.com"
+  role   = "roles/pubsub.publisher"
+}
+
+output "subscription_id" {
+  value = google_pubsub_subscription.main.id
+}
+modules/cloudresources/pubsub/variables.tf
+
+hcl
+Copy code
+variable "name" {
+  description = "The name of the Pub/Sub topic and subscription."
+  type        = string
+}
+
+variable "region" {
+  description = "The region for the Pub/Sub resources."
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name used for encryption."
+  type        = string
+}
+
+variable "service_account_email" {
+  description = "The email of the service account to use for Pub/Sub subscription."
+  type        = string
+}
+
+variable "project_number" {
+  description = "The GCP project number."
+  type        = string
+}
+Module: Cloud Run
+modules/cloudrun/main.tf
+
+hcl
+Copy code
+data "google_vpc_access_connector" "main" {
+  project = var.project
+  name    = var.vpc_connector_name
+}
+
+resource "google_cloud_run_v2_service" "main" {
+  provider      = google-beta
+  name          = var.name
+  location      = var.region
+  launch_stage  = "BETA"
+
+  template {
+    execution_environment = "execution_environment_2"
+    labels                = var.labels
+    encryption_key        = var.kms_key_name
+    service_account       = var.service_account_email
+    timeout               = "30s"
+
+    scaling {
+      max_instance_count = 1
+      min_instance_count = 1
+    }
+
+    containers {
+      image = var.image
+      args  = ["--config", "/etc/otea/config.yaml"]
+
+      ports {
+        name           = "http1"
+        container_port = 8080
+      }
+
+      env {
+        name  = "config_hash"
+        value = var.config_hash
+      }
+
+      resources {
+        limits {
+          cpu    = "100m"
+          memory = "512Mi"
+        }
+      }
+
+      startup_probe {
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+
+        http_get {
+          path = "/"
+          port = 8080
+        }
+      }
+
+      liveness_probe {
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+
+        http_get {
+          path = "/"
+          port = 8080
+        }
+      }
+    }
+
+    volumes {
+      name = "octa-config"
+      gcs {
+        bucket    = var.bucket_id
+        read_only = true
+      }
+    }
+
+    vpc_access {
+      egress    = "ALL_TRAFFIC"
+      connector = data.google_vpc_access_connector.main.id
+    }
+  }
+
+  depends_on = var.bucket_object_dependency
+}
+modules/cloudrun/variables.tf
+
+hcl
+Copy code
+variable "name" {
+  description = "The name of the Cloud Run service."
+  type        = string
+}
+
+variable "region" {
+  description = "The region for the Cloud Run service."
+  type        = string
+}
+
+variable "labels" {
+  description = "Labels for the Cloud Run service."
+  type        = map(string)
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name used for encryption."
+  type        = string
+}
+
+variable "service_account_email" {
+  description = "The email of the service account to use for Cloud Run."
+  type        = string
+}
+
+variable "image" {
+  description = "The container image to deploy."
+  type        = string
+}
+
+variable "project" {
+  description = "The GCP project ID."
+  type        = string
+}
+
+variable "vpc_connector_name" {
+  description = "The name of the VPC connector."
+  type        = string
+}
+
+variable "bucket_id" {
+  description = "The ID of the GCS bucket to use for config."
+  type        = string
+}
+
+variable "config_hash" {
+  description = "Hash value of the config content."
+  type        = string
+}
+
+variable "bucket_object_dependency" {
+  description = "Dependency on the bucket object creation."
+  type        = list(any)
+}
+Environment: Development
+environments/dev/main.tf
+
+hcl
+Copy code
+terraform {
+  backend "remote" {
+    organization = "your-organization"
+
+    workspaces {
+      name = "dev"
+    }
+  }
+}
+
+provider "google" {
+  project = var.project
+  region  = var.region
+}
+
+provider "google-beta" {
+  project = var.project
+  region  = var.region
+}
+
+module "storage" {
+  source         = "../../modules/cloudresources/storage"
+  bucket_name    = "my-bucket"
+  region         = "us-central1"
+  kms_key_name   = "projects/my-project/locations/us/keyRings/my-keyring/cryptoKeys/my-key"
+  config_content = local.storage_config_content
+}
+
+module "pubsub" {
+  source = "../../modules/cloudresources/pubsub"
+
+  name                  = var.name
+  region                = var.region
+  kms_key_name          = var.kms_key_name
+  service_account_email = google_service_account.cloudrun.email
+  project_number        = data.google_project.main.number
+}
+
+module "cloudrun" {
+  source = "../../modules/cloudresources/cloudrun"
+
+  name                  = var.name
+  region                = var.region
+  labels                = var.labels
+  kms_key_name          = var.kms_key_name
+  service_account_email = google_service_account.cloudrun.email
+  image                 = var.image
+  project               = var.project
+  vpc_connector_name    = var.vpc_connector_name
+  bucket_id             = module.storage.google_storage_bucket.main.id
+  subscription_id       = module.pubsub.subscription_id
+  config_hash           = local.config_hash
+  bucket_object_dependency = [module.storage.google_storage_bucket_object.main]
+}
+
+resource "google_service_account" "cloudrun" {
+  account_id = "logging-octa"
+}
+
+data "google_project" "main" {}
+
+locals {
+  storage_config_content = templatefile(
+    "template/config.yml.tmpl",
+    {
+      project      = var.project,
+      subscription = module.pubsub.subscription_id,
+    }
+  )
+
+  config_hash = sha256(local.storage_config_content)
+}
+environments/dev/variables.tf
+
+hcl
+Copy code
+variable "name" {
+  description = "Name of the resources."
+  type        = string
+}
+
+variable "region" {
+  description = "Region for the resources."
+  type        = string
+}
+
+variable "labels" {
+  description = "Labels for the Cloud Run service."
+  type        = map(string)
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name used for encryption."
+  type        = string
+}
+
+variable "image" {
+  description = "The container image to deploy."
+  type        = string
+}
+
+variable "project" {
+  description = "The GCP project ID."
+  type        = string
+}
+
+variable "vpc_connector_name" {
+  description = "The name of the VPC connector."
+  type        = string
+}
+environments/dev/dev.tfvars
+
+hcl
+Copy code
+name              = "my-cloud-run-service"
+region            = "us-central1"
+kms_key_name      = "projects/my-project/locations/us/keyRings/my-keyring/cryptoKeys/my-key"
+labels            = { "env" = "dev" }
+image             = "gcr.io/my-project/my-image:latest"
+project           = "my-project"
+vpc_connector_name = "vpc-connector-name"
+Environment: Production
+The production environment setup (main.tf and prod.tfvars) remains similar to the development environment, with appropriate values adjusted for production use.
+
+This structure ensures that the locals block relevant to storage configuration stays outside the module while maintaining the modular and organized approach you're looking for. Adjust paths and module sources as per your actual setup and directory structure in your Terraform configuration.
+
+
+
+
+
+
+
 
 
 

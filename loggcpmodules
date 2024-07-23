@@ -1,0 +1,567 @@
+To structure your Terraform code for a production-ready environment and support Terraform Enterprise Edition, we will follow a modular approach. The folder structure will be organized as follows:
+
+css
+Copy code
+terraform
+  ├── environments
+  │   ├── dev
+  │   │   ├── main.tf
+  │   │   ├── variables.tf
+  │   │   └── terraform.tfvars
+  │   └── prod
+  │       ├── main.tf
+  │       ├── variables.tf
+  │       └── terraform.tfvars
+  └── modules
+      ├── cloud-resources
+      │   ├── pubsub
+      │   │   ├── main.tf
+      │   │   ├── variables.tf
+      │   │   └── outputs.tf
+      │   ├── cloudrun
+      │   │   ├── main.tf
+      │   │   ├── variables.tf
+      │   │   └── outputs.tf
+      │   ├── iam
+      │   │   ├── main.tf
+      │   │   ├── variables.tf
+      │   │   └── outputs.tf
+      │   ├── artifactregistry
+      │   │   ├── main.tf
+      │   │   ├── variables.tf
+      │   │   └── outputs.tf
+      │   └── bucket
+      │       ├── main.tf
+      │       ├── variables.tf
+      │       └── outputs.tf
+Root main.tf and variables.tf Files
+environments/dev/main.tf and environments/prod/main.tf
+These files will call the respective modules.
+
+hcl
+Copy code
+# environments/dev/main.tf and environments/prod/main.tf
+
+provider "google" {
+  project = var.project
+  region  = var.region
+}
+
+module "artifact_registry" {
+  source          = "../../modules/cloud-resources/artifactregistry"
+  name            = var.name
+  kms_key_name    = var.kms_key_name
+}
+
+module "bucket" {
+  source          = "../../modules/cloud-resources/bucket"
+  name            = var.name
+  region          = var.region
+  kms_key_name    = var.kms_key_name
+  config_content  = var.config_content
+}
+
+module "pubsub" {
+  source          = "../../modules/cloud-resources/pubsub"
+  name            = var.name
+  region          = var.region
+  kms_key_name    = var.kms_key_name
+}
+
+module "cloudrun" {
+  source                  = "../../modules/cloud-resources/cloudrun"
+  name                    = var.name
+  region                  = var.region
+  docker_image            = var.docker_image
+  memory                  = var.memory
+  project                 = var.project
+  opensearch_password     = var.opensearch_password
+  vpc_connector_id        = var.vpc_connector_id
+}
+
+module "iam" {
+  source                  = "../../modules/cloud-resources/iam"
+  name                    = var.name
+  service_account_email   = module.cloudrun.service_account_email
+  pubsub_topic_id         = module.pubsub.topic_id
+  pubsub_subscription_id  = module.pubsub.subscription_id
+  bucket_id               = module.bucket.bucket_id
+  project_number          = data.google_project.main.number
+}
+
+resource "google_logging_project_sink" "main" {
+  name        = var.name
+  disabled    = false
+  destination = "pubsub.googleapis.com/${module.pubsub.topic_id}"
+  filter      = ""
+}
+
+data "google_project" "main" {}
+environments/dev/variables.tf and environments/prod/variables.tf
+hcl
+Copy code
+# environments/dev/variables.tf and environments/prod/variables.tf
+
+variable "project" {
+  description = "The GCP project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "The GCP region"
+  type        = string
+}
+
+variable "name" {
+  description = "The name of the resources"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name"
+  type        = string
+}
+
+variable "config_content" {
+  description = "The content for the config file"
+  type        = string
+}
+
+variable "docker_image" {
+  description = "The Docker image for Cloud Run"
+  type        = string
+}
+
+variable "memory" {
+  description = "The memory limit for Cloud Run"
+  type        = string
+}
+
+variable "opensearch_password" {
+  description = "Password for OpenSearch"
+  type        = string
+  sensitive   = true
+}
+
+variable "vpc_connector_id" {
+  description = "The VPC connector ID for Cloud Run"
+  type        = string
+}
+environments/dev/terraform.tfvars and environments/prod/terraform.tfvars
+hcl
+Copy code
+# environments/dev/terraform.tfvars and environments/prod/terraform.tfvars
+
+project              = "my-gcp-project-id"
+region               = "us-central1"
+name                 = "my-resource-name"
+kms_key_name         = "projects/my-gcp-project/locations/us/keyRings/my-key-ring/cryptoKeys/my-key"
+config_content       = "content of your config file"
+docker_image         = "gcr.io/my-gcp-project/my-docker-image"
+memory               = "512"
+opensearch_password  = "my-opensearch-password"
+vpc_connector_id     = "projects/my-gcp-project/locations/us/connectors/my-vpc-connector"
+Module main.tf, variables.tf, and outputs.tf Files
+Each module will have its own main.tf, variables.tf, and outputs.tf to define resources, accept input variables, and output necessary values.
+
+modules/cloud-resources/artifactregistry/main.tf
+hcl
+Copy code
+# modules/cloud-resources/artifactregistry/main.tf
+
+resource "google_artifact_registry_repository" "main" {
+  repository_id = var.name
+  format        = "DOCKER"
+  kms_key_name  = var.kms_key_name
+
+  docker_config {
+    immutable_tags = true
+  }
+}
+modules/cloud-resources/artifactregistry/variables.tf
+hcl
+Copy code
+# modules/cloud-resources/artifactregistry/variables.tf
+
+variable "name" {
+  description = "The name of the Artifact Registry repository"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name"
+  type        = string
+}
+modules/cloud-resources/artifactregistry/outputs.tf
+hcl
+Copy code
+# modules/cloud-resources/artifactregistry/outputs.tf
+
+output "repository_id" {
+  value = google_artifact_registry_repository.main.id
+}
+modules/cloud-resources/bucket/main.tf
+hcl
+Copy code
+# modules/cloud-resources/bucket/main.tf
+
+resource "google_storage_bucket" "main" {
+  name          = var.name
+  location      = var.region
+  uniform_bucket_level_access = true
+
+  encryption {
+    default_kms_key_name = var.kms_key_name
+  }
+}
+
+resource "google_storage_bucket_object" "main" {
+  name    = "config.yaml"
+  content = var.config_content
+  bucket  = google_storage_bucket.main.name
+}
+modules/cloud-resources/bucket/variables.tf
+hcl
+Copy code
+# modules/cloud-resources/bucket/variables.tf
+
+variable "name" {
+  description = "The name of the storage bucket"
+  type        = string
+}
+
+variable "region" {
+  description = "The region of the storage bucket"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name"
+  type        = string
+}
+
+variable "config_content" {
+  description = "The content for the config file"
+  type        = string
+}
+modules/cloud-resources/bucket/outputs.tf
+hcl
+Copy code
+# modules/cloud-resources/bucket/outputs.tf
+
+output "bucket_id" {
+  value = google_storage_bucket.main.id
+}
+modules/cloud-resources/pubsub/main.tf
+hcl
+Copy code
+# modules/cloud-resources/pubsub/main.tf
+
+resource "google_pubsub_topic" "main" {
+  name                 = var.name
+  kms_key_name         = var.kms_key_name
+  message_retention_duration = "3600s"
+  message_storage_policy {
+    allowed_persistence_regions = [var.region]
+  }
+}
+
+resource "google_pubsub_subscription" "main" {
+  name                      = var.name
+  topic                     = google_pubsub_topic.main.name
+  ack_deadline_seconds      = 20
+  message_retention_duration = "3600s"
+}
+modules/cloud-resources/pubsub/variables.tf
+hcl
+Copy code
+# modules/cloud-resources/pubsub/variables.tf
+
+variable "name" {
+  description = "The name of the Pub/Sub topic and subscription"
+  type        = string
+}
+
+variable "region" {
+  description = "The region for the Pub/Sub resources"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name"
+  type        = string
+}
+modules/cloud-resources/pubsub/outputs.tf
+hcl
+Copy code
+# modules/cloud-resources/pubsub/outputs.tf
+
+output "topic_id" {
+  value = google_pubsub_topic.main.id
+}
+
+output "subscription_id" {
+  value = google_pubsub_subscription.main.id
+}
+modules/cloud-resources/cloudrun/main.tf
+hcl
+Copy code
+# modules/cloud-resources/cloudrun/main.tf
+
+locals {
+  pipeline_content = templatefile("${path.module}/files/pipeline.conf.tmpl", {
+    project             = var.project,
+    topic               = google_pubsub_topic.main.name,
+    subscription        = google_pubsub_subscription.main.name,
+    opensearch_password = var.opensearch_password
+  })
+
+  pipeline_hash = sha256(local.pipeline_content)
+}
+
+resource "google_cloud_run_v2_service" "main" {
+  provider      = google-beta
+  name          = var.name
+  location      = var.region
+  launch_stage  = "BETA"
+  ingress       = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  scaling {
+    min_instance_count = 1
+    max_instance_count = 1
+  }
+
+  template {
+    execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
+    labels                = var.labels
+    encryption_key        = var.kms_key_name
+    service_account       = google_service_account.cloudrun.email
+    timeout               = "30s"
+
+    containers {
+      image = var.docker_image
+
+      volume_mounts {
+        name       = "logstash-pipeline"
+        mount_path = "/usr/share/logstash/pipeline/"
+      }
+
+      ports {
+        name           = "http1"
+        container_port = 8080
+      }
+
+      env {
+        name  = "LS_JAVA_OPTS"
+        value = "Xmx${var.memory}m"
+      }
+
+      env {
+        name  = "LOG_LEVEL"
+        value = "info"
+      }
+
+      env {
+        name  = "MONITORING_ENABLED"
+        value = "true"
+      }
+
+      env {
+        name  = "PIPELINE_WORKERS"
+        value = "4"
+      }
+
+      env {
+        name  = "PIPELINE_BATCH_SIZE"
+        value = "250"
+      }
+
+      env {
+        name  = "PIPELINE_BATCH_DELAY"
+        value = "50"
+      }
+
+      env {
+        name  = "PIPELINE_HASH"
+        value = local.pipeline_hash
+      }
+
+      resources {
+        limits {
+          cpu    = "100m"
+          memory = "512Mi"
+        }
+      }
+
+      startup_probe {
+        http_get {
+          path = "/"
+          port = 8080
+        }
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+      }
+
+      liveness_probe {
+        http_get {
+          path = "/"
+          port = 8080
+        }
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+      }
+    }
+
+    volumes {
+      name = "logstash-pipeline"
+      gcs {
+        bucket    = google_storage_bucket.main.id
+        read_only = true
+      }
+    }
+
+    vpc_access {
+      egress    = "ALL_TRAFFIC"
+      connector = var.vpc_connector_id
+    }
+  }
+
+  depends_on = [google_storage_bucket_object.main]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "main" {
+  for_each = toset(["xxxx@gmail.com"])
+
+  name   = google_cloud_run_v2_service.main.name
+  role   = "roles/run.invoker"
+  member = "user:${each.value}"
+}
+modules/cloud-resources/cloudrun/variables.tf
+hcl
+Copy code
+# modules/cloud-resources/cloudrun/variables.tf
+
+variable "name" {
+  description = "The name of the Cloud Run service"
+  type        = string
+}
+
+variable "region" {
+  description = "The region for the Cloud Run service"
+  type        = string
+}
+
+variable "docker_image" {
+  description = "The Docker image for Cloud Run"
+  type        = string
+}
+
+variable "memory" {
+  description = "The memory limit for Cloud Run"
+  type        = string
+}
+
+variable "project" {
+  description = "The GCP project ID"
+  type        = string
+}
+
+variable "opensearch_password" {
+  description = "Password for OpenSearch"
+  type        = string
+  sensitive   = true
+}
+
+variable "vpc_connector_id" {
+  description = "The VPC connector ID for Cloud Run"
+  type        = string
+}
+
+variable "labels" {
+  description = "Labels for Cloud Run"
+  type        = map(string)
+  default     = {}
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name"
+  type        = string
+}
+modules/cloud-resources/cloudrun/outputs.tf
+hcl
+Copy code
+# modules/cloud-resources/cloudrun/outputs.tf
+
+output "service_account_email" {
+  value = google_service_account.cloudrun.email
+}
+modules/cloud-resources/iam/main.tf
+hcl
+Copy code
+# modules/cloud-resources/iam/main.tf
+
+resource "google_service_account" "cloudrun" {
+  account_id = "logging-octa"
+}
+
+resource "google_pubsub_subscription_iam_member" "cloudrun" {
+  subscription = var.pubsub_subscription_id
+  member       = "serviceAccount:${var.service_account_email}"
+  role         = "roles/pubsub.subscriber"
+}
+
+resource "google_storage_bucket_iam_member" "cloudrun" {
+  bucket = var.bucket_id
+  member = "serviceAccount:${var.service_account_email}"
+  role   = "roles/storage.objectViewer"
+}
+
+resource "google_pubsub_topic_iam_member" "sink" {
+  topic  = var.pubsub_topic_id
+  member = "serviceAccount:service-${var.project_number}@gcp-sa-logging.iam.gserviceaccount.com"
+  role   = "roles/pubsub.publisher"
+}
+modules/cloud-resources/iam/variables.tf
+hcl
+Copy code
+# modules/cloud-resources/iam/variables.tf
+
+variable "service_account_email" {
+  description = "The service account email for Cloud Run"
+  type        = string
+}
+
+variable "pubsub_subscription_id" {
+  description = "The Pub/Sub subscription ID"
+  type        = string
+}
+
+variable "bucket_id" {
+  description = "The storage bucket ID"
+  type        = string
+}
+
+variable "pubsub_topic_id" {
+  description = "The Pub/Sub topic ID"
+  type        = string
+}
+
+variable "project_number" {
+  description = "The GCP project number"
+  type        = string
+}
+modules/cloud-resources/iam/outputs.tf
+hcl
+Copy code
+# modules/cloud-resources/iam/outputs.tf
+
+output "service_account_email" {
+  value = google_service_account.cloudrun.email
+}
+This modular approach ensures that the resources are managed separately and can be reused across different environments. The terraform.tfvars files provide environment-specific configurations, making it easy to manage and deploy resources in multiple environments.

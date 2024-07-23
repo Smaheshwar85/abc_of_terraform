@@ -1,3 +1,241 @@
+creating the sink in the application project with the correct writer identity, we need to structure the Terraform configuration as follows:
+
+Updated Structure
+modules/cloud-resources/pubsub/main.tf
+hcl
+Copy code
+# modules/cloud-resources/pubsub/main.tf
+
+resource "google_pubsub_topic" "main" {
+  name                   = var.name
+  kms_key_name           = var.kms_key_name
+  message_retention_duration = "${60*60}s"
+  message_storage_policy {
+    allowed_persistence_regions = [var.region]
+  }
+}
+
+resource "google_pubsub_subscription" "main" {
+  name                     = var.name
+  topic                    = google_pubsub_topic.main.name
+  ack_deadline_seconds     = 20
+  message_retention_duration = "${60*60}s"
+}
+
+output "topic_id" {
+  value = google_pubsub_topic.main.id
+}
+
+output "subscription_id" {
+  value = google_pubsub_subscription.main.id
+}
+modules/cloud-resources/pubsub/variables.tf
+hcl
+Copy code
+# modules/cloud-resources/pubsub/variables.tf
+
+variable "name" {
+  description = "The name of the Pub/Sub topic"
+  type        = string
+}
+
+variable "region" {
+  description = "The region for the Pub/Sub topic"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name"
+  type        = string
+}
+modules/cloud-resources/iam/main.tf
+hcl
+Copy code
+# modules/cloud-resources/iam/main.tf
+
+resource "google_service_account" "cloudrun" {
+  account_id = "logging-octa"
+}
+
+resource "google_pubsub_subscription_iam_member" "cloudrun" {
+  subscription = var.pubsub_subscription_id
+  member       = "serviceAccount:${var.service_account_email}"
+  role         = "roles/pubsub.subscriber"
+}
+
+resource "google_storage_bucket_iam_member" "cloudrun" {
+  bucket = var.bucket_id
+  member = "serviceAccount:${var.service_account_email}"
+  role   = "roles/storage.objectViewer"
+}
+
+resource "google_pubsub_topic_iam_member" "sink" {
+  topic  = var.pubsub_topic_id
+  member = var.sink_writer_identity
+  role   = "roles/pubsub.publisher"
+}
+modules/cloud-resources/iam/variables.tf
+hcl
+Copy code
+# modules/cloud-resources/iam/variables.tf
+
+variable "service_account_email" {
+  description = "The service account email for Cloud Run"
+  type        = string
+}
+
+variable "pubsub_subscription_id" {
+  description = "The Pub/Sub subscription ID"
+  type        = string
+}
+
+variable "bucket_id" {
+  description = "The storage bucket ID"
+  type        = string
+}
+
+variable "pubsub_topic_id" {
+  description = "The Pub/Sub topic ID"
+  type        = string
+}
+
+variable "sink_writer_identity" {
+  description = "The writer identity for the sink"
+  type        = string
+}
+modules/cloud-resources/iam/outputs.tf
+hcl
+Copy code
+# modules/cloud-resources/iam/outputs.tf
+
+output "service_account_email" {
+  value = google_service_account.cloudrun.email
+}
+environments/dev/main.tf and environments/prod/main.tf
+hcl
+Copy code
+# environments/dev/main.tf and environments/prod/main.tf
+
+provider "google" {
+  project = var.central_project
+  region  = var.region
+}
+
+provider "google.app" {
+  project = var.application_project
+  region  = var.region
+}
+
+module "artifact_registry" {
+  source          = "../../modules/cloud-resources/artifactregistry"
+  name            = var.name
+  kms_key_name    = var.kms_key_name
+}
+
+module "bucket" {
+  source          = "../../modules/cloud-resources/bucket"
+  name            = var.name
+  region          = var.region
+  kms_key_name    = var.kms_key_name
+  config_content  = var.config_content
+}
+
+module "pubsub" {
+  source          = "../../modules/cloud-resources/pubsub"
+  name            = var.name
+  region          = var.region
+  kms_key_name    = var.kms_key_name
+}
+
+module "cloudrun" {
+  source                  = "../../modules/cloud-resources/cloudrun"
+  name                    = var.name
+  region                  = var.region
+  docker_image            = var.docker_image
+  memory                  = var.memory
+  project                 = var.central_project
+  opensearch_password     = var.opensearch_password
+  vpc_connector_id        = var.vpc_connector_id
+}
+
+module "iam" {
+  source                  = "../../modules/cloud-resources/iam"
+  name                    = var.name
+  service_account_email   = module.cloudrun.service_account_email
+  pubsub_topic_id         = module.pubsub.topic_id
+  pubsub_subscription_id  = module.pubsub.subscription_id
+  bucket_id               = module.bucket.bucket_id
+  sink_writer_identity    = data.google_project.application_project_writer_identity.id
+}
+
+resource "google_logging_project_sink" "main" {
+  provider       = google.app
+  name           = var.name
+  disabled       = false
+  destination    = "pubsub.googleapis.com/${module.pubsub.topic_id}"
+  filter         = ""
+
+  writer_identity = "serviceAccount:service-${data.google_project.application_project.number}@gcp-sa-logging.iam.gserviceaccount.com"
+}
+
+data "google_project" "application_project" {
+  provider = google.app
+}
+
+data "google_project" "application_project_writer_identity" {
+  provider = google.app
+  project_id = var.application_project
+}
+environments/dev/terraform.tfvars and environments/prod/terraform.tfvars
+hcl
+Copy code
+# environments/dev/terraform.tfvars and environments/prod/terraform.tfvars
+
+application_project = "your-application-project-id"
+central_project     = "your-central-project-id"
+region              = "your-region"
+name                = "your-resource-name"
+kms_key_name        = "your-kms-key-name"
+config_content      = "your-config-content"
+docker_image        = "your-docker-image"
+memory              = 512
+opensearch_password = "your-opensearch-password"
+vpc_connector_id    = "your-vpc-connector-id"
+Explanation of Changes
+Central Project Configuration: Pub/Sub topic, Cloud Run, Artifact Registry, and Bucket resources are created in the central project using the google provider.
+Application Project Configuration: The logging sink is created in the application project using the google.app provider.
+Sink Writer Identity: The sink's writer identity is configured to use the default logging service account for the application project. This ensures the sink can write to the Pub/Sub topic in the central project.
+IAM Configuration: The IAM module ensures the necessary permissions are granted for the service accounts to interact with the Pub/Sub topic and storage bucket in the central project.
+This setup ensures that logs from the application project are correctly sent to the Pub/Sub topic in the central project with the appropriate permission
+=======================================================================================================================================================================
+
+
+
+
+
+
+===========================================================================================================================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 To structure your Terraform code for a production-ready environment and support Terraform Enterprise Edition, we will follow a modular approach. The folder structure will be organized as follows:
 
 css

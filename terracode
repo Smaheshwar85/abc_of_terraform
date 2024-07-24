@@ -1,3 +1,497 @@
+Corrected Terraform Configuration
+1. Pub/Sub Module
+Define the Pub/Sub module to create topics and subscriptions.
+
+modules/cloud-resources/pubsub/main.tf
+
+hcl
+Copy code
+resource "google_pubsub_topic" "main" {
+  name     = var.name
+  kms_key_name = var.kms_key_name
+}
+
+resource "google_pubsub_subscription" "main" {
+  name  = var.subscription_name
+  topic = google_pubsub_topic.main.name
+  ack_deadline_seconds = 20
+}
+
+output "topic_name" {
+  value = google_pubsub_topic.main.name
+}
+
+output "subscription_name" {
+  value = google_pubsub_subscription.main.name
+}
+modules/cloud-resources/pubsub/variables.tf
+
+hcl
+Copy code
+variable "name" {
+  description = "The name of the Pub/Sub topic"
+  type        = string
+}
+
+variable "subscription_name" {
+  description = "The name of the Pub/Sub subscription"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name for encryption"
+  type        = string
+}
+2. Cloud Run Module
+Define the Cloud Run service and generate the pipeline_content.
+
+modules/cloud-resources/cloudrun/main.tf
+
+hcl
+Copy code
+locals {
+  pipeline_content = templatefile("${path.module}/files/pipeline.conf.tmpl", {
+    project             = var.project,
+    topic               = var.pubsub_topic_name,
+    subscription        = var.pubsub_subscription_name,
+    opensearch_password = var.opensearch_password
+  })
+  pipeline_hash = sha256(local.pipeline_content)
+}
+
+resource "google_cloud_run_v2_service" "main" {
+  provider     = google-beta
+  name         = var.name
+  location     = var.region
+  launch_stage = "BETA"
+  ingress      = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  scaling {
+    main_instance_count = 1
+  }
+
+  template {
+    execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
+    labels                = var.labels
+    encryption_key        = var.kms_key_name
+    service_account       = var.service_account_email
+    timeout               = "30s"
+    scaling {
+      max_instance_count = 1
+      min_instance_count = 1
+    }
+    containers {
+      image = var.docker_image
+      volume_mounts {
+        name       = "logstash-pipeline"
+        mount_path = "/usr/share/logstash/pipeline/"
+      }
+
+      ports {
+        name           = "http1"
+        container_port = 8080
+      }
+      env {
+        name  = "LS_JAVA_OPTS"
+        value = "Xmx${var.memory}m"
+      }
+      env {
+        name  = "LOG_LEVEL"
+        value = "info"
+      }
+      env {
+        name  = "MONITORING_ENABLED"
+        value = "true"
+      }
+      env {
+        name  = "PIPELINE_WORKERS"
+        value = "4"
+      }
+      env {
+        name  = "PIPELINE_BATCH_SIZE"
+        value = "250"
+      }
+      env {
+        name  = "PIPELINE_BATCH_DELAY"
+        value = "50"
+      }
+      env {
+        name  = "PIPELINE_HASH"
+        value = local.pipeline_hash
+      }
+
+      resources {
+        cpu_idle = false
+        limits {
+          cpu    = "100m"
+          memory = "512Mi"
+        }
+      }
+
+      startup_probe {
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+        http_get {
+          path = "/"
+          port = 8080
+        }
+      }
+
+      liveness_probe {
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+        http_get {
+          path = "/"
+          port = 8080
+        }
+      }
+    }
+    volumes {
+      name = "logstash-pipeline"
+      gcs {
+        bucket    = var.bucket_name
+        read_only = true
+      }
+    }
+    vpc_access {
+      egress    = "ALL_TRAFFIC"
+      connector = var.vpc_connector
+    }
+  }
+
+  depends_on = [
+    google_storage_bucket.main
+  ]
+}
+
+output "pipeline_content" {
+  value = local.pipeline_content
+}
+modules/cloud-resources/cloudrun/variables.tf
+
+hcl
+Copy code
+variable "name" {
+  description = "The name of the Cloud Run service"
+  type        = string
+}
+
+variable "region" {
+  description = "The region where the Cloud Run service is located"
+  type        = string
+}
+
+variable "labels" {
+  description = "Labels for the Cloud Run service"
+  type        = map(string)
+  default     = {}
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name for encryption"
+  type        = string
+}
+
+variable "docker_image" {
+  description = "The Docker image for Cloud Run"
+  type        = string
+}
+
+variable "memory" {
+  description = "Memory limit for Cloud Run"
+  type        = number
+}
+
+variable "opensearch_password" {
+  description = "Password for OpenSearch"
+  type        = string
+  sensitive   = true
+}
+
+variable "pubsub_topic_name" {
+  description = "Pub/Sub topic name"
+  type        = string
+}
+
+variable "pubsub_subscription_name" {
+  description = "Pub/Sub subscription name"
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "Name of the bucket to be used in Cloud Run"
+  type        = string
+}
+
+variable "vpc_connector" {
+  description = "VPC connector for Cloud Run"
+  type        = string
+}
+
+variable "service_account_email" {
+  description = "Email of the service account for Cloud Run"
+  type        = string
+}
+3. Main Configuration
+Ensure the pipeline_content from Cloud Run is used in the bucket module.
+
+environments/dev/main.tf
+
+hcl
+Copy code
+provider "google" {
+  project = var.central_project
+  region  = var.region
+}
+
+module "pubsub" {
+  source       = "../../modules/cloud-resources/pubsub"
+  name         = var.pubsub_topic_name
+  subscription_name = var.pubsub_subscription_name
+  kms_key_name = var.kms_key_name
+}
+
+module "cloudrun" {
+  source                   = "../../modules/cloud-resources/cloudrun"
+  name                     = var.cloudrun_name
+  region                   = var.region
+  labels                   = var.labels
+  kms_key_name             = var.kms_key_name
+  docker_image             = var.docker_image
+  memory                   = var.memory
+  opensearch_password      = var.opensearch_password
+  pubsub_topic_name        = module.pubsub.topic_name
+  pubsub_subscription_name = module.pubsub.subscription_name
+  bucket_name              = google_storage_bucket.main.name
+  vpc_connector            = var.vpc_connector
+  service_account_email    = var.service_account_email
+}
+
+module "bucket" {
+  source           = "../../modules/cloud-resources/bucket"
+  name             = var.bucket_name
+  region           = var.region
+  kms_key_name     = var.kms_key_name
+  pipeline_content = module.cloudrun.pipeline_content
+}
+
+module "logging_sink" {
+  source     = "../../modules/logging_sink"
+  providers  = { google = google.application }
+  name       = var.sink_name
+  project    = var.application_project
+  pubsub_topic = module.pubsub.topic_name
+  filter     = var.log_filter
+}
+environments/dev/variables.tf
+
+hcl
+Copy code
+variable "central_project" {
+  description = "The central project ID"
+  type        = string
+}
+
+variable "application_project" {
+  description = "The application project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "The region"
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "The name of the bucket"
+  type        = string
+}
+
+variable "cloudrun_name" {
+  description = "The name of the Cloud Run service"
+  type        = string
+}
+
+variable "sink_name" {
+  description = "The name of the logging sink"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "KMS key name"
+  type        = string
+}
+
+variable "labels" {
+  description = "Labels for the resources"
+  type        = map(string)
+  default     = {}
+}
+
+variable "docker_image" {
+  description = "Docker image for Cloud Run"
+  type        = string
+}
+
+variable "memory" {
+  description = "Memory for Cloud Run"
+  type        = number
+}
+
+variable "opensearch_password" {
+  description = "OpenSearch password"
+  type        = string
+  sensitive   = true
+}
+
+variable "vpc_connector" {
+  description = "VPC connector"
+  type        = string
+}
+
+variable "service_account_email" {
+  description = "Email of the service account for Cloud Run"
+  type        = string
+}
+
+variable "log_filter" {
+  description = "Filter for logging sink"
+  type        = string
+}
+environments/prod/main.tf
+This configuration is similar to the dev environment but with production-specific values.
+
+environments/prod/main.tf
+
+hcl
+Copy code
+provider "google" {
+  project = var.central_project
+  region  = var.region
+}
+
+module "pubsub" {
+  source       = "../../modules/cloud-resources/pubsub"
+  name         = var.pubsub_topic_name
+  subscription_name = var.pubsub_subscription_name
+  kms_key_name = var.kms_key_name
+}
+
+module "cloudrun" {
+  source                   = "../../modules/cloud-resources/cloudrun"
+  name                     = var.cloudrun_name
+  region                   = var.region
+  labels                   = var.labels
+  kms_key_name             = var.kms_key_name
+  docker_image             = var.docker_image
+  memory                   = var.memory
+  opensearch_password      = var.opensearch_password
+  pubsub_topic_name        = module.pubsub.topic_name
+  pubsub_subscription_name = module.pubsub.subscription_name
+  bucket_name              = google_storage_bucket.main.name
+  vpc_connector            = var.vpc_connector
+  service_account_email    = var.service_account_email
+}
+
+module "bucket" {
+  source           = "../../modules/cloud-resources/bucket"
+  name             = var.bucket_name
+  region           = var.region
+  kms_key_name     = var.kms_key_name
+  pipeline_content = module.cloudrun.pipeline_content
+}
+
+module "logging_sink" {
+  source     = "../../modules/logging_sink"
+  providers  = { google = google.application }
+  name       = var.sink_name
+  project    = var.application_project
+  pubsub_topic = module.pubsub.topic_name
+  filter     = var.log_filter
+}
+environments/prod/variables.tf
+
+hcl
+Copy code
+variable "central_project" {
+  description = "The central project ID"
+  type        = string
+}
+
+variable "application_project" {
+  description = "The application project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "The region"
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "The name of the bucket"
+  type        = string
+}
+
+variable "cloudrun_name" {
+  description = "The name of the Cloud Run service"
+  type        = string
+}
+
+variable "sink_name" {
+  description = "The name of the logging sink"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "KMS key name"
+  type        = string
+}
+
+variable "labels" {
+  description = "Labels for the resources"
+  type        = map(string)
+  default     = {}
+}
+
+variable "docker_image" {
+  description = "Docker image for Cloud Run"
+  type        = string
+}
+
+variable "memory" {
+  description = "Memory for Cloud Run"
+  type        = number
+}
+
+variable "opensearch_password" {
+  description = "OpenSearch password"
+  type        = string
+  sensitive   = true
+}
+
+variable "vpc_connector" {
+  description = "VPC connector"
+  type        = string
+}
+
+variable "service_account_email" {
+  description = "Email of the service account for Cloud Run"
+  type        = string
+}
+
+variable "log_filter" {
+  description = "Filter for logging sink"
+  type        = string
+}
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+                                                              ************************************************************
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 You're correct; we have a circular dependency issue here, where the Cloud Run service depends on the bucket content, and the bucket depends on the Cloud Run service's pipeline content. This circular dependency can be tricky, but it can be resolved with some adjustments.
 
 Here’s how you can handle this issue:

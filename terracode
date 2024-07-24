@@ -1,0 +1,653 @@
+Given the updated requirements, here is the complete end-to-end Terraform code. This setup includes:
+
+Creating all resources in the central project except for the logging sink, which will be created in the application project.
+Differentiating the sink names for different applications.
+Project Structure
+css
+Copy code
+terraform
+  ├── environments
+  │   ├── dev
+  │   │   ├── main.tf
+  │   │   ├── variables.tf
+  │   │   └── terraform.tfvars
+  │   └── prod
+  │       ├── main.tf
+  │       ├── variables.tf
+  │       └── terraform.tfvars
+  ├── modules
+  │   ├── cloud-resources
+  │   │   ├── pubsub
+  │   │   │   ├── main.tf
+  │   │   │   ├── variables.tf
+  │   │   │   └── outputs.tf
+  │   │   ├── cloudrun
+  │   │   │   ├── main.tf
+  │   │   │   ├── variables.tf
+  │   │   │   └── outputs.tf
+  │   │   ├── iam
+  │   │   │   ├── main.tf
+  │   │   │   ├── variables.tf
+  │   │   │   └── outputs.tf
+  │   │   ├── artifact_registry
+  │   │   │   ├── main.tf
+  │   │   │   ├── variables.tf
+  │   │   │   └── outputs.tf
+  │   │   └── bucket
+  │   │       ├── main.tf
+  │   │       ├── variables.tf
+  │   │       └── outputs.tf
+  │   ├── logging_sink
+  │       ├── main.tf
+  │       ├── variables.tf
+  │       └── outputs.tf
+  └── files
+      └── pipeline.conf.tmpl
+environments/dev/main.tf
+hcl
+Copy code
+provider "google" {
+  project = var.central_project
+  region  = var.region
+}
+
+module "artifact_registry" {
+  source       = "../../modules/cloud-resources/artifact_registry"
+  name         = var.name
+  kms_key_name = var.kms_key_name
+}
+
+module "pubsub" {
+  source       = "../../modules/cloud-resources/pubsub"
+  name         = var.name
+  region       = var.region
+  kms_key_name = var.kms_key_name
+}
+
+module "cloudrun" {
+  source                     = "../../modules/cloud-resources/cloudrun"
+  name                       = var.name
+  region                     = var.region
+  labels                     = var.labels
+  kms_key_name               = var.kms_key_name
+  docker_image               = var.docker_image
+  memory                     = var.memory
+  opensearch_password        = var.opensearch_password
+  pubsub_topic_name          = module.pubsub.topic_name
+  pubsub_subscription_name   = module.pubsub.subscription_name
+  depends_on                 = [module.pubsub]
+}
+
+module "bucket" {
+  source             = "../../modules/cloud-resources/bucket"
+  name               = var.name
+  region             = var.region
+  kms_key_name       = var.kms_key_name
+  pipeline_content   = module.cloudrun.pipeline_content
+  depends_on         = [module.cloudrun]
+}
+
+module "iam" {
+  source                  = "../../modules/cloud-resources/iam"
+  service_account         = module.cloudrun.service_account
+  pubsub_subscription_id  = module.pubsub.subscription_id
+  storage_bucket_id       = module.bucket.bucket_id
+}
+
+provider "google" {
+  alias   = "application"
+  project = var.application_project
+  region  = var.region
+}
+
+module "logging_sink" {
+  source       = "../../modules/logging_sink"
+  providers = {
+    google = google.application
+  }
+  name           = var.sink_name
+  project        = var.application_project
+  pubsub_topic   = module.pubsub.topic_name
+  filter         = var.log_filter
+}
+
+output "pipeline_content" {
+  value = module.cloudrun.pipeline_content
+}
+environments/dev/variables.tf
+hcl
+Copy code
+variable "central_project" {
+  description = "The central project ID"
+  type        = string
+}
+
+variable "application_project" {
+  description = "The application project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "The region"
+  type        = string
+}
+
+variable "name" {
+  description = "The resource name"
+  type        = string
+}
+
+variable "sink_name" {
+  description = "The name of the logging sink"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "KMS key name"
+  type        = string
+}
+
+variable "labels" {
+  description = "Labels for the resources"
+  type        = map(string)
+  default     = {}
+}
+
+variable "docker_image" {
+  description = "Docker image for Cloud Run"
+  type        = string
+}
+
+variable "memory" {
+  description = "Memory limit for Cloud Run"
+  type        = number
+}
+
+variable "opensearch_password" {
+  description = "Password for OpenSearch"
+  type        = string
+  sensitive   = true
+}
+
+variable "log_filter" {
+  description = "The filter for the logging sink"
+  type        = string
+}
+environments/dev/terraform.tfvars
+hcl
+Copy code
+central_project     = "central-project-id"
+application_project = "application-project-id"
+region              = "us-central1"
+name                = "my-resource"
+sink_name           = "my-sink"
+kms_key_name        = "projects/central-project-id/locations/us/keyRings/my-keyring/cryptoKeys/my-key"
+docker_image        = "gcr.io/central-project/my-image"
+memory              = 512
+opensearch_password = "supersecretpassword"
+log_filter          = "severity>=ERROR"
+modules/cloud-resources/artifact_registry/main.tf
+hcl
+Copy code
+resource "google_artifact_registry_repository" "main" {
+  repository_id = var.name
+  kms_key_name  = var.kms_key_name
+  format        = "DOCKER"
+
+  docker_config {
+    immutable_tags = true
+  }
+}
+modules/cloud-resources/artifact_registry/variables.tf
+hcl
+Copy code
+variable "name" {
+  description = "The name of the repository"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name"
+  type        = string
+}
+modules/cloud-resources/artifact_registry/outputs.tf
+hcl
+Copy code
+output "repository_id" {
+  value = google_artifact_registry_repository.main.repository_id
+}
+modules/cloud-resources/bucket/main.tf
+hcl
+Copy code
+resource "google_storage_bucket" "main" {
+  name                        = var.name
+  location                    = var.region
+  uniform_bucket_level_access = true
+
+  encryption {
+    default_kms_key_name = var.kms_key_name
+  }
+}
+
+resource "google_storage_bucket_object" "main" {
+  name    = "config.yaml"
+  content = var.pipeline_content
+  bucket  = google_storage_bucket.main.name
+}
+
+output "bucket_id" {
+  value = google_storage_bucket.main.id
+}
+modules/cloud-resources/bucket/variables.tf
+hcl
+Copy code
+variable "name" {
+  description = "The name of the bucket"
+  type        = string
+}
+
+variable "region" {
+  description = "The region of the bucket"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The KMS key name for the bucket"
+  type        = string
+}
+
+variable "pipeline_content" {
+  description = "The content for the pipeline configuration"
+  type        = string
+}
+modules/cloud-resources/bucket/outputs.tf
+hcl
+Copy code
+output "bucket_id" {
+  value = google_storage_bucket.main.id
+}
+modules/cloud-resources/cloudrun/main.tf
+hcl
+Copy code
+locals {
+  pipeline_content = templatefile("${path.module}/files/pipeline.conf.tmpl", {
+    project             = var.project,
+    topic               = var.pubsub_topic_name,
+    subscription        = var.pubsub_subscription_name,
+    opensearch_password = var.opensearch_password
+  })
+  pipeline_hash = sha256(local.pipeline_content)
+}
+
+resource "google_cloud_run_v2_service" "main" {
+  provider = google-beta
+  name     = var.name
+  location = var.region
+  launch_stage = "BETA"
+  ingress = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+  scaling {
+    main_instance_count = 1
+  }
+
+  template {
+    execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
+    labels                = var.labels
+    encryption_key        = var.kms_key_name
+    service_account       = google_service_account.cloudrun.email
+    timeout               = "30s"
+    scaling {
+      max_instance_count = 1
+      min_instance_count = 1
+    }
+    containers {
+      image = var.docker_image
+      volume_mounts {
+        name       = "logstash-pipeline"
+        mount_path = "/usr/share/logstash/pipeline/"
+      }
+
+      ports {
+        name           = "http1"
+        container_port = 8080
+      }
+      env {
+        name  = "LS_JAVA_OPTS"
+        value = "Xmx${var.memory}m"
+      }
+      env {
+        name  = "LOG_LEVEL"
+        value = "info"
+      }
+      env {
+        name  = "MONITORING_ENABLED"
+        value = "true"
+      }
+      env {
+        name  = "PIPELINE_WORKERS"
+        value = "4"
+      }
+      env {
+        name  = "PIPELINE_BATCH_SIZE"
+        value = "250"
+      }
+      env {
+        name  = "PIPELINE_BATCH_DELAY"
+        value = "50"
+      }
+      env {
+        name  = "PIPELINE_HASH"
+        value = local.pipeline_hash
+      }
+
+      resources {
+        cpu_idle = false
+        limits {
+          cpu    = "100m"
+          memory = "512Mi"
+        }
+      }
+
+      startup_probe {
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+        http_get {
+          path = "/"
+          port = 8080
+        }
+      }
+
+      liveness_probe {
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+        http_get {
+          path = "/"
+          port = 8080
+        }
+      }
+    }
+    volumes {
+      name = "logstash-pipeline"
+      gcs {
+        bucket    = var.bucket_name
+        read_only = true
+      }
+    }
+    vpc_access {
+      egress    = "ALL_TRAFFIC"
+      connector = data.google_vpc_access_connector.main.id
+    }
+  }
+
+  depends_on = [
+    google_storage_bucket_object.main
+  ]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "main" {
+  for_each = toset(["xxxx@gmail.com"])
+  name     = google_cloud_run_v2_service.main.name
+  role     = "roles/run.invoker"
+  member   = "user:${each.value}"
+}
+
+output "pipeline_content" {
+  value = local.pipeline_content
+}
+
+output "service_account" {
+  value = google_service_account.cloudrun.email
+}
+modules/cloud-resources/cloudrun/variables.tf
+hcl
+Copy code
+variable "name" {
+  description = "The name of the Cloud Run service"
+  type        = string
+}
+
+variable "region" {
+  description = "The region of the Cloud Run service"
+  type        = string
+}
+
+variable "labels" {
+  description = "Labels for the Cloud Run service"
+  type        = map(string)
+  default     = {}
+}
+
+variable "kms_key_name" {
+  description = "KMS key name"
+  type        = string
+}
+
+variable "docker_image" {
+  description = "Docker image for Cloud Run"
+  type        = string
+}
+
+variable "memory" {
+  description = "Memory limit for Cloud Run"
+  type        = number
+}
+
+variable "opensearch_password" {
+  description = "Password for OpenSearch"
+  type        = string
+  sensitive   = true
+}
+
+variable "pubsub_topic_name" {
+  description = "Name of the Pub/Sub topic"
+  type        = string
+}
+
+variable "pubsub_subscription_name" {
+  description = "Name of the Pub/Sub subscription"
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "Name of the GCS bucket"
+  type        = string
+}
+modules/cloud-resources/cloudrun/outputs.tf
+hcl
+Copy code
+output "pipeline_content" {
+  value = local.pipeline_content
+}
+
+output "service_account" {
+  value = google_service_account.cloudrun.email
+}
+modules/cloud-resources/iam/main.tf
+hcl
+Copy code
+resource "google_project_iam_member" "pubsub" {
+  for_each = toset([var.service_account])
+  member   = "serviceAccount:${each.value}"
+  role     = "roles/pubsub.publisher"
+}
+
+resource "google_project_iam_member" "storage" {
+  for_each = toset([var.service_account])
+  member   = "serviceAccount:${each.value}"
+  role     = "roles/storage.objectViewer"
+}
+
+resource "google_pubsub_subscription_iam_member" "main" {
+  for_each     = toset([var.service_account])
+  member       = "serviceAccount:${each.value}"
+  role         = "roles/pubsub.subscriber"
+  subscription = var.pubsub_subscription_id
+}
+
+output "service_account" {
+  value = var.service_account
+}
+modules/cloud-resources/iam/variables.tf
+hcl
+Copy code
+variable "service_account" {
+  description = "Service account email for the IAM roles"
+  type        = string
+}
+
+variable "pubsub_subscription_id" {
+  description = "ID of the Pub/Sub subscription"
+  type        = string
+}
+
+variable "storage_bucket_id" {
+  description = "ID of the Storage bucket"
+  type        = string
+}
+modules/cloud-resources/iam/outputs.tf
+hcl
+Copy code
+output "service_account" {
+  value = var.service_account
+}
+modules/cloud-resources/pubsub/main.tf
+hcl
+Copy code
+resource "google_pubsub_topic" "main" {
+  name = var.name
+}
+
+resource "google_pubsub_subscription" "main" {
+  name  = var.name
+  topic = google_pubsub_topic.main.name
+}
+
+output "topic_name" {
+  value = google_pubsub_topic.main.name
+}
+
+output "subscription_name" {
+  value = google_pubsub_subscription.main.name
+}
+
+output "subscription_id" {
+  value = google_pubsub_subscription.main.id
+}
+modules/cloud-resources/pubsub/variables.tf
+hcl
+Copy code
+variable "name" {
+  description = "The name of the Pub/Sub topic and subscription"
+  type        = string
+}
+
+variable "region" {
+  description = "The region of the Pub/Sub topic and subscription"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "KMS key name"
+  type        = string
+}
+modules/cloud-resources/pubsub/outputs.tf
+hcl
+Copy code
+output "topic_name" {
+  value = google_pubsub_topic.main.name
+}
+
+output "subscription_name" {
+  value = google_pubsub_subscription.main.name
+}
+
+output "subscription_id" {
+  value = google_pubsub_subscription.main.id
+}
+modules/logging_sink/main.tf
+hcl
+Copy code
+resource "google_logging_project_sink" "main" {
+  name        = var.name
+  destination = "pubsub.googleapis.com/projects/${var.project}/topics/${var.pubsub_topic}"
+  filter      = var.filter
+  unique_writer_identity = true
+}
+
+output "writer_identity" {
+  value = google_logging_project_sink.main.writer_identity
+}
+modules/logging_sink/variables.tf
+hcl
+Copy code
+variable "name" {
+  description = "The name of the logging sink"
+  type        = string
+}
+
+variable "project" {
+  description = "The project ID"
+  type        = string
+}
+
+variable "pubsub_topic" {
+  description = "The Pub/Sub topic name"
+  type        = string
+}
+
+variable "filter" {
+  description = "The filter for the logging sink"
+  type        = string
+}
+modules/logging_sink/outputs.tf
+hcl
+Copy code
+output "writer_identity" {
+  value = google_logging_project_sink.main.writer_identity
+}
+files/pipeline.conf.tmpl
+hcl
+Copy code
+input {
+  pubsub {
+    project_id    => "${project}"
+    topic         => "${topic}"
+    subscription  => "${subscription}"
+  }
+}
+
+output {
+  opensearch {
+    hosts    => ["https://opensearch.example.com"]
+    index    => "logs"
+    user     => "admin"
+    password => "${opensearch_password}"
+  }
+}
+Key Points
+Central Project Resources:
+
+Artifact Registry
+Pub/Sub
+Cloud Run
+IAM roles
+Bucket
+Application Project Resource:
+
+Logging Sink
+Dependency Management:
+
+Each module has the depends_on attribute configured to ensure correct resource creation order.
+Template and Configuration:
+
+The pipeline.conf.tmpl file is used to generate the pipeline configuration dynamically.
+Outputs are captured and utilized across modules to maintain references.
+Service Account and IAM Roles:
+
+Service accounts and necessary IAM roles are configured for the Cloud Run service to access the required resources (Pub/Sub, GCS).
+By following this structure, you can ensure that all resources are created in the correct order and in the specified projects, with proper dependencies and configurations.

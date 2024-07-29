@@ -1,4 +1,166 @@
 
+The error indicates that the service account used by Google Cloud Pub/Sub does not have the necessary permissions to use the Cloud KMS key. You need to grant the roles/cloudkms.cryptoKeyEncrypterDecrypter role to the service account for the project containing the KMS key.
+
+Here's how to fix the permission issue:
+
+Identify the service account used by Pub/Sub.
+Grant the required role to the service account.
+Let's implement the necessary changes to grant the roles/cloudkms.cryptoKeyEncrypterDecrypter role to the Pub/Sub service account.
+
+Step 1: Identify the Service Account
+Typically, Google Cloud Pub/Sub uses the default service account of the project. This service account is in the format: [PROJECT_NUMBER]-compute@developer.gserviceaccount.com.
+
+Step 2: Grant the cloudkms.cryptoKeyEncrypterDecrypter Role
+Add a new IAM binding to grant the necessary role to the service account.
+
+Add IAM Binding in iam.tf
+First, you need to get the project number. You can use a data source to retrieve this information:
+
+hcl
+Copy code
+data "google_project" "central" {
+  project_id = var.central_project_id
+}
+
+data "google_project" "application" {
+  project_id = var.application_project_id
+}
+Then, grant the roles/cloudkms.cryptoKeyEncrypterDecrypter role to the service account:
+
+hcl
+Copy code
+resource "google_project_iam_binding" "pubsub_kms_role" {
+  project = data.google_project.central.project_id
+
+  role = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+
+  members = [
+    "serviceAccount:${data.google_project.central.number}-compute@developer.gserviceaccount.com"
+  ]
+}
+Update Your Main Configuration
+Ensure your main configuration in your environment files includes the new IAM role binding. For example, in environments/dev/main.tf:
+
+hcl
+Copy code
+module "iam" {
+  source = "../../modules/iam"
+  central_project_id     = var.central_project_id
+  application_project_id = var.application_project_id
+  service_account_email  = module.cloudrun.service_account_email
+}
+
+module "pubsub" {
+  source      = "../../modules/pubsub"
+  project_id  = var.central_project_id
+  name        = var.pubsub_name
+  region      = var.region
+  kms_key_name = var.kms_key_name
+}
+
+module "bucket" {
+  source      = "../../modules/bucket"
+  project_id  = var.central_project_id
+  environment = var.environment
+  name        = var.bucket_name
+  region      = var.region
+  kms_key_name = var.kms_key_name
+  pipeline_content = module.cloudrun.pipeline_content
+}
+
+module "cloudrun" {
+  source                  = "../../modules/cloudrun"
+  project_id              = var.central_project_id
+  name                    = var.cloudrun_name
+  region                  = var.region
+  bucket_name             = module.bucket.bucket_name
+  kms_key_name            = var.kms_key_name
+  service_account_email   = module.iam.cloudrun_service_account_email
+  pubsub_topic_name       = module.pubsub.topic_name
+  pubsub_subscription_name = var.pubsub_subscription_name
+  opensearch_password     = var.opensearch_password
+}
+
+module "logging_sink" {
+  source           = "../../modules/logging_sink"
+  project_id       = var.application_project_id
+  name             = var.logging_sink_name
+  pubsub_topic_name = module.pubsub.topic_name
+}
+Ensure Variable Definitions
+Ensure all required variables are defined in variables.tf:
+
+environments/dev/variables.tf
+hcl
+Copy code
+variable "central_project_id" {
+  description = "The GCP project ID for the central project"
+  type        = string
+}
+
+variable "application_project_id" {
+  description = "The GCP project ID for the application project"
+  type        = string
+}
+
+variable "pubsub_name" {
+  description = "The name of the Pub/Sub topic"
+  type        = string
+}
+
+variable "cloudrun_name" {
+  description = "The name of the Cloud Run service"
+  type        = string
+}
+
+variable "bucket_name" {
+  description = "The base name of the bucket"
+  type        = string
+}
+
+variable "region" {
+  description = "The region for the resources"
+  type        = string
+}
+
+variable "kms_key_name" {
+  description = "The name of the KMS key"
+  type        = string
+}
+
+variable "pubsub_subscription_name" {
+  description = "The name of the Pub/Sub subscription"
+  type        = string
+}
+
+variable "opensearch_password" {
+  description = "Password for OpenSearch"
+  type        = string
+  sensitive   = true
+}
+
+variable "logging_sink_name" {
+  description = "The name of the logging sink"
+  type        = string
+}
+Define terraform.tfvars
+Define the values in terraform.tfvars for the dev environment:
+
+hcl
+Copy code
+central_project_id = "your-central-project-id"
+application_project_id = "your-application-project-id"
+pubsub_name = "my-pubsub-topic"
+cloudrun_name = "my-cloudrun-service"
+bucket_name = "my-bucket"
+region = "us-central1"
+kms_key_name = "projects/your-central-project-id/locations/global/keyRings/your-key-ring/cryptoKeys/your-key"
+pubsub_subscription_name = "my-pubsub-subscription"
+opensearch_password = "your-opensearch-password"
+logging_sink_name = "my-logging-sink"
+By making these changes, you should be able to resolve the permission error and ensure all dependencies are correctly configured.
+
+************************************************************************************************************************************************************************************************************************
 
 
 

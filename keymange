@@ -1,0 +1,67 @@
+To integrate the specified conditions with your existing steps, let's ensure the wrapping of the temporary AES key with the correct algorithm and hashing functions based on the import method.
+
+Steps to Wrap the AES Key and Import into Google Cloud KMS
+Generate an RSA Private Key:
+
+sh
+Copy code
+openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:2048
+Generate the Corresponding Public Key:
+
+sh
+Copy code
+openssl rsa -pubout -in private_key.pem -out public_key.pem
+Generate an AES Key:
+
+sh
+Copy code
+openssl rand -out aes_key.bin 32
+Wrap the AES Key Using the Public Key:
+Based on the import method, select the appropriate hashing functions and wrapping algorithm.
+
+For rsa-oaep-3072-sha1-aes-256 or rsa-oaep-4096-sha1-aes-256 (use sha1):
+
+sh
+Copy code
+openssl pkeyutl -encrypt -pubin -inkey public_key.pem -in aes_key.bin -out wrapped_key.bin -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha1 -pkeyopt rsa_mgf1_md:sha1
+For rsa-oaep-3072-sha256-aes-256 or rsa-oaep-4096-sha256-aes-256 (use sha256):
+
+sh
+Copy code
+openssl pkeyutl -encrypt -pubin -inkey public_key.pem -in aes_key.bin -out wrapped_key.bin -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -pkeyopt rsa_mgf1_md:sha256
+Create an Import Job:
+Ensure you create an import job in Google Cloud KMS that matches the wrapping algorithm you used. Here are examples for each method:
+
+For rsa-oaep-3072-sha1-aes-256:
+
+sh
+Copy code
+gcloud kms import-jobs create myasmjobs --location europe-west3 --keyring kms_keyring --algorithm RSA_OAEP_3072_SHA1_AES_256
+For rsa-oaep-4096-sha1-aes-256:
+
+sh
+Copy code
+gcloud kms import-jobs create myasmjobs --location europe-west3 --keyring kms_keyring --algorithm RSA_OAEP_4096_SHA1_AES_256
+For rsa-oaep-3072-sha256-aes-256:
+
+sh
+Copy code
+gcloud kms import-jobs create myasmjobs --location europe-west3 --keyring kms_keyring --algorithm RSA_OAEP_3072_SHA256_AES_256
+For rsa-oaep-4096-sha256-aes-256:
+
+sh
+Copy code
+gcloud kms import-jobs create myasmjobs --location europe-west3 --keyring kms_keyring --algorithm RSA_OAEP_4096_SHA256_AES_256
+Import the Wrapped Key into Google Cloud KMS:
+Ensure the wrapped key file is correctly specified and matches the import job created.
+
+sh
+Copy code
+gcloud kms keys versions import --import-job myasmjobs --location europe-west3 --keyring kms_keyring --key kms_key --algorithm GOOGLE_SYMMETRIC_ENCRYPTION --target-key-file wrapped_key.bin
+Summary
+Generate RSA Keys: Create a private and public RSA key pair.
+Generate AES Key: Create a temporary AES key.
+Wrap AES Key: Wrap the AES key using the public RSA key and the correct padding and hash function based on the import method.
+Create Import Job: Create an import job in Google Cloud KMS with the appropriate algorithm.
+Import Wrapped Key: Import the wrapped key into Google Cloud KMS using the created import job.
+By following these steps, you should be able to correctly wrap the AES key and import it into Google Cloud KMS. Make sure the hashing function and padding mode match the requirements of the import job you are using.

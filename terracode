@@ -1,6 +1,78 @@
+The issue you are facing is likely due to the mismatch between the wrapping method used in your OpenSSL commands and what Google Cloud KMS expects. Specifically, the Google Cloud KMS import command expects the wrapped key to be of a specific format and length.
+
+Here's a breakdown and some adjustments to your commands:
+
+Generate an RSA Private Key:
+
+sh
+Copy code
+openssl genpkey -algorithm RSA -out private_key.pem -pkeyopt rsa_keygen_bits:2048
+Generate the Corresponding Public Key:
+
+sh
+Copy code
+openssl rsa -pubout -in private_key.pem -out public_key.pem
+Generate an AES Key:
+
+sh
+Copy code
+openssl rand -out aes_key.bin 32
+Wrap the AES Key Using the Public Key:
+
+sh
+Copy code
+openssl pkeyutl -encrypt -pubin -inkey public_key.pem -in aes_key.bin -out wrapped_key.bin -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -pkeyopt rsa_mgf1_md:sha256
+Import the Wrapped Key into Google Cloud KMS:
+
+sh
+Copy code
+gcloud kms keys versions import --import-job myasmjobs --location europe-west3 --keyring kms_keyring --key kms_key --algorithm google-symmetric-encryption --target-key-file wrapped_key.bin
+Key Points:
+Algorithm Mismatch: Ensure that the algorithm specified in the gcloud kms keys versions import command matches the wrapping algorithm you used.
+Import Job: The import-job must be correctly set up in Google Cloud KMS for the type of key you are importing.
+Wrapped Key Length: The wrapped key must conform to the length expected by the KMS import job.
+Example with Correct Configuration:
+Create an Import Job:
+
+Ensure you have created an import job in Google Cloud KMS that matches the wrapping algorithm you used (e.g., RSA-OAEP).
+sh
+Copy code
+gcloud kms import-jobs create myasmjobs --location europe-west3 --keyring kms_keyring --algorithm RSA_OAEP_2048_SHA256
+Import Command:
+
+sh
+Copy code
+gcloud kms keys versions import --import-job myasmjobs --location europe-west3 --keyring kms_keyring --key kms_key --algorithm RSA_OAEP_2048_SHA256 --target-key-file wrapped_key.bin
+Troubleshooting:
+Check the Wrapped Key File:
+
+Ensure that wrapped_key.bin is correctly generated and not corrupted.
+Verify the length of wrapped_key.bin. For RSA 2048, the wrapped key should be 256 bytes.
+sh
+Copy code
+ls -l wrapped_key.bin
+# The size should be 256 bytes for RSA 2048
+Ensure Base64 Encoding (if Required):
+
+Some APIs expect the wrapped key to be in Base64 format. If needed, you can convert it:
+sh
+Copy code
+base64 wrapped_key.bin > wrapped_key.b64
+Adjust the import command if using Base64 encoding:
+
+sh
+Copy code
+gcloud kms keys versions import --import-job myasmjobs --location europe-west3 --keyring kms_keyring --key kms_key --algorithm RSA_OAEP_2048_SHA256 --target-key-file wrapped_key.b64
+By ensuring that the wrapping method, key length, and import job configurations are correctly aligned, you should be able to successfully import the wrapped key into Google Cloud KMS.
 
 
 
+
+
+
+*************************************************************************************************************************************************************************************
+
+***************************************************************************************************************************************
 
 
 

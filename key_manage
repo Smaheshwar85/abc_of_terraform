@@ -1,4 +1,11 @@
-
+variable "import_method" {
+  description = "The import method for the KMS Import Job"
+  type        = string
+  validation {
+    condition     = contains(["RSA_OAEP_3072_SHA1_AES_256", "RSA_OAEP_4096_SHA1_AES_256"], var.import_method)
+    error_message = "The import method must be one of 'RSA_OAEP_3072_SHA1_AES_256' or 'RSA_OAEP_4096_SHA1_AES_256'."
+  }
+}
 Folder Structure:
 css
 Copy code

@@ -1,3 +1,218 @@
+
+Folder Structure:
+css
+Copy code
+terraform
+  ├── environments
+  │   ├── dev
+  │   │   ├── main.tf
+  │   │   ├── variables.tf
+  │   │   └── terraform.tfvars
+  │   └── prod
+  │       ├── main.tf
+  │       ├── variables.tf
+  │       └── terraform.tfvars
+  └── modules
+      ├── kms
+      │   ├── main.tf
+      │   ├── variables.tf
+      │   └── outputs.tf
+Module Code:
+modules/kms/main.tf
+hcl
+Copy code
+resource "google_kms_key_ring" "key_ring" {
+  name     = var.key_ring_name
+  location = var.location
+}
+
+resource "google_kms_crypto_key" "crypto_key" {
+  name     = var.crypto_key_name
+  key_ring = google_kms_key_ring.key_ring.id
+  purpose  = var.crypto_key_purpose
+}
+
+resource "google_kms_import_job" "import_job" {
+  name          = var.import_job_name
+  location      = var.location
+  key_ring      = google_kms_key_ring.key_ring.id
+  import_method = var.import_method
+}
+
+resource "google_kms_crypto_key_version" "imported_key_version" {
+  key      = google_kms_crypto_key.crypto_key.id
+  algorithm = var.import_algorithm
+  import_job = google_kms_import_job.import_job.id
+  import_file = var.import_file_path
+}
+modules/kms/variables.tf
+hcl
+Copy code
+variable "key_ring_name" {
+  description = "The name of the KMS Key Ring"
+  type        = string
+}
+
+variable "crypto_key_name" {
+  description = "The name of the KMS Crypto Key"
+  type        = string
+}
+
+variable "location" {
+  description = "The location of the KMS resources"
+  type        = string
+}
+
+variable "crypto_key_purpose" {
+  description = "The purpose of the KMS Crypto Key"
+  type        = string
+  default     = "ENCRYPT_DECRYPT"
+}
+
+variable "import_job_name" {
+  description = "The name of the KMS Import Job"
+  type        = string
+}
+
+variable "import_method" {
+  description = "The import method for the KMS Import Job"
+  type        = string
+}
+
+variable "import_algorithm" {
+  description = "The algorithm for the imported key"
+  type        = string
+}
+
+variable "import_file_path" {
+  description = "The path to the file containing the base64-encoded key material"
+  type        = string
+}
+modules/kms/outputs.tf
+hcl
+Copy code
+output "key_ring_name" {
+  value = google_kms_key_ring.key_ring.name
+}
+
+output "crypto_key_name" {
+  value = google_kms_crypto_key.crypto_key.name
+}
+
+output "import_job_name" {
+  value = google_kms_import_job.import_job.name
+}
+
+output "imported_key_version" {
+  value = google_kms_crypto_key_version.imported_key_version.name
+}
+Environment Configuration:
+environments/dev/main.tf
+hcl
+Copy code
+provider "google" {
+  project = var.project
+  region  = var.region
+}
+
+module "kms" {
+  source             = "../../modules/kms"
+  key_ring_name      = var.key_ring_name
+  crypto_key_name    = var.crypto_key_name
+  location           = var.location
+  crypto_key_purpose = var.crypto_key_purpose
+  import_job_name    = var.import_job_name
+  import_method      = var.import_method
+  import_algorithm   = var.import_algorithm
+  import_file_path   = var.import_file_path
+}
+environments/dev/variables.tf
+hcl
+Copy code
+variable "project" {
+  description = "The GCP project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "The GCP region"
+  type        = string
+}
+
+variable "key_ring_name" {
+  description = "The name of the KMS Key Ring"
+  type        = string
+  default     = "my-key-ring"
+}
+
+variable "crypto_key_name" {
+  description = "The name of the KMS Crypto Key"
+  type        = string
+  default     = "my-key"
+}
+
+variable "location" {
+  description = "The location of the KMS resources"
+  type        = string
+  default     = "global"
+}
+
+variable "crypto_key_purpose" {
+  description = "The purpose of the KMS Crypto Key"
+  type        = string
+  default     = "ENCRYPT_DECRYPT"
+}
+
+variable "import_job_name" {
+  description = "The name of the KMS Import Job"
+  type        = string
+  default     = "my-import-job"
+}
+
+variable "import_method" {
+  description = "The import method for the KMS Import Job"
+  type        = string
+  default     = "raw"
+}
+
+variable "import_algorithm" {
+  description = "The algorithm for the imported key"
+  type        = string
+  default     = "google-symmetric-encryption"
+}
+
+variable "import_file_path" {
+  description = "The path to the file containing the base64-encoded key material"
+  type        = string
+  default     = "path/to/base64-encoded-key-material-file"
+}
+environments/dev/terraform.tfvars
+hcl
+Copy code
+project            = "your-gcp-project-id"
+region             = "your-gcp-region"
+key_ring_name      = "my-key-ring"
+crypto_key_name    = "my-key"
+location           = "global"
+crypto_key_purpose = "ENCRYPT_DECRYPT"
+import_job_name    = "my-import-job"
+import_method      = "raw"
+import_algorithm   = "google-symmetric-encryption"
+import_file_path   = "path/to/base64-encoded-key-material-file"
+You can replicate the same structure for the prod environment by modifying the terraform.tfvars file with production values.
+
+This modular approach separates the logic (modules) from the configuration (environments), making the codebase easier to maintain and adapt to different environments. Ensure you have the necessary IAM permissions and service account credentials configured in your Terraform provider for Google Cloud.
+
+8888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
+
+
+4666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666666
+
+
+
+
+
+
 Yes, you can wrap a public key with an asymmetric key on-premises and then import it into a cloud KMS (Key Management Service). Here's a high-level overview of the steps involved in this process:
 
 Steps to Wrap and Import a Public Key into Cloud KMS

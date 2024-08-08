@@ -1,3 +1,79 @@
+
+input {
+  google_pubsub {
+    project_id => "your-project-id"
+    topic => "your-topic-name"
+    subscription => "your-subscription-name"
+    create_subscription => false
+    enable_metric => true
+    max_messages => 100
+    codec => "json"
+    # Optionally set type to differentiate messages if needed
+    type => "pubsub-logs"
+  }
+}
+
+filter {
+  # Extract `project_id` from the message
+  if [message][resource][labels][project_id] {
+    mutate {
+      add_field => { "application_name" => "%{[message][resource][labels][project_id]}" }
+    }
+  } else {
+    # Fallback if project_id is missing
+    mutate {
+      add_field => { "application_name" => "unknown" }
+    }
+  }
+
+  # Optionally parse JSON if the message field contains nested JSON data
+  if [message] {
+    json {
+      source => "message"
+      target => "parsed_message"
+      remove_field => ["message"]
+    }
+  }
+
+  # Conditional index assignment based on `project_id`
+  if [application_name] == "project-a-id" {
+    mutate {
+      add_field => { "[@metadata][target_index]" => "appA-logs" }
+    }
+  } else if [application_name] == "project-b-id" {
+    mutate {
+      add_field => { "[@metadata][target_index]" => "appB-logs" }
+    }
+  } else {
+    mutate {
+      add_field => { "[@metadata][target_index]" => "default-logs" }
+    }
+  }
+}
+
+output {
+  opensearch {
+    hosts => ["https://your-opensearch-domain:9200"]
+    ssl => true
+    user => "your-username"
+    password => "your-password"
+    manage_template => false
+    index => "%{[@metadata][target_index]}-%{+YYYY.MM.dd}"
+    action => "create"
+    retry_on_conflict => 3
+    timeout => 60
+    dead_letter_queue_path => "/var/log/logstash/dead_letter_queue"
+    dead_letter_queue_max_bytes => "1024mb"
+  }
+}
+
+
+=========================================================================================================================================================================================================
+==================================================================================================================================================================
+
+
+
+
 To create a production-ready Logstash configuration based on the scenario you described, I'll modify the configuration to include best practices such as proper error handling, optimization, and security measures. Below is the updated and corrected Logstash configuration:
 
 Updated Logstash Configuration

@@ -1,4 +1,64 @@
+input {
+  google_pubsub {
+    project_id => "your-project-id"
+    topic => "your-topic-name"
+    subscription => "your-subscription-name"
+    create_subscription => false
+    enable_metric => true
+    max_message => 100
+  }
+}
 
+filter {
+  json {
+    source => "message"
+    target => "parsed_message"
+  }
+  
+  if [parsed_message][project_id] {
+    mutate {
+      add_field => { "project_id" => "%{[parsed_message][project_id]}" }
+    }
+  }
+}
+
+output {
+  if [project_id] == "your-project-id-1" {
+    opensearch {
+      hosts => ["https://your-opensearch-domain:9200"]
+      ssl => true
+      user => "your-username"
+      password => "your-password"
+      manage_template => false
+      index => "index-name-for-project-id-1"
+      action => "create"
+    }
+  } else if [project_id] == "your-project-id-2" {
+    opensearch {
+      hosts => ["https://your-opensearch-domain:9200"]
+      ssl => true
+      user => "your-username"
+      password => "your-password"
+      manage_template => false
+      index => "index-name-for-project-id-2"
+      action => "create"
+    }
+  } else {
+    opensearch {
+      hosts => ["https://your-opensearch-domain:9200"]
+      ssl => true
+      user => "your-username"
+      password => "your-password"
+      manage_template => false
+      index => "default-index"
+      action => "create"
+    }
+  }
+}
+
+
+
+*********************************************************************************************************************************************************
 input {
   google_pubsub {
     project_id => "your-project-id"

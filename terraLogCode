@@ -1,0 +1,139 @@
+Production-Ready Documentation for Google Cloud Log Processing Pipeline
+1. Overview
+This document provides a comprehensive guide to setting up a Google Cloud log processing pipeline that forwards application logs to a Logstash instance running on Cloud Run. The architecture leverages key Google Cloud services, including Artifact Registry, Cloud Run, Pub/Sub, IAM, and Cloud Storage Buckets. This setup ensures secure, efficient, and scalable log processing for production environments.
+
+2. Architecture Overview
+2.1 Key Components
+Artifact Registry:
+
+Purpose: Stores Docker images, including the Logstash image used by Cloud Run.
+Role Requirements:
+roles/artifactregistry.admin: For managing repositories and images.
+roles/artifactregistry.reader: For accessing stored images.
+Connections: Cloud Run pulls the Logstash image from the Artifact Registry to create container instances.
+Cloud Run:
+
+Purpose: Runs the Logstash container, processing logs received from Pub/Sub.
+Role Requirements:
+roles/run.admin: For service management and deployment.
+roles/iam.serviceAccountUser: To utilize service accounts for secure operations.
+roles/compute.networkUser: If VPC connectivity is required for the service.
+Connections: Subscribes to a Pub/Sub topic to receive logs, processes them, and forwards processed logs to their final destination.
+Pub/Sub:
+
+Purpose: Serves as a messaging service that buffers and delivers logs. Logs are published to a topic and consumed by Cloud Run via a subscription.
+Role Requirements:
+roles/pubsub.admin: For creating and managing topics and subscriptions.
+roles/pubsub.publisher: For services that need to publish logs to topics.
+roles/pubsub.subscriber: For services that consume logs from subscriptions.
+Connections: The Logging Sink forwards logs to Pub/Sub topics, and Cloud Run instances subscribe to these topics to process the logs.
+IAM (Identity and Access Management):
+
+Purpose: Manages permissions and roles across all services, ensuring that only authorized identities can perform specific actions.
+Role Requirements: Various roles are assigned to service accounts to provide secure and necessary permissions for each component.
+Connections: IAM policies govern access between Cloud Run, Pub/Sub, Cloud Storage, and Artifact Registry, ensuring secure communication and data flow.
+Cloud Storage Buckets:
+
+Purpose: Stores configuration files, such as Logstash pipelines, SSL certificates, and other required assets.
+Role Requirements:
+roles/storage.admin: For managing buckets and their contents.
+roles/storage.objectViewer: For granting read access to Cloud Run or other services that need to access these files.
+Connections: Cloud Run accesses these files during service initialization to configure the Logstash pipeline correctly.
+Logging Sink:
+
+Purpose: Captures logs from applications and forwards them to a Pub/Sub topic for processing.
+Role Requirements:
+roles/logging.admin: For managing and creating logging sinks.
+roles/pubsub.publisher: For publishing logs from the Logging Sink to the Pub/Sub topic.
+Connections: Directly forwards application logs to the Pub/Sub topic, which are then processed by Cloud Run.
+2.2 Resource Connections
+Artifact Registry stores the Logstash Docker image that is pulled by Cloud Run to create container instances.
+Cloud Run subscribes to Pub/Sub topics to receive logs and uses configurations stored in Cloud Storage Buckets.
+Pub/Sub serves as the intermediary messaging service, collecting logs from Logging Sinks and forwarding them to Cloud Run.
+IAM ensures all resources are accessed securely by assigning appropriate roles and permissions.
+3. Naming Conventions
+To ensure consistency, clarity, and ease of maintenance, follow these naming conventions across all resources:
+
+Project ID Prefix: Prefix all resource names with the project ID to ensure uniqueness across projects.
+Environment Suffix: Append the environment name (dev, test, prod) to distinguish resources across environments.
+Resource Type Identifier: Include a short identifier in the name to indicate the resource type (e.g., cr for Cloud Run, ps for Pub/Sub).
+Examples:
+
+Cloud Run Service: {project-id}-{env}-logstash-cr
+Pub/Sub Topic: {project-id}-{env}-logs-ps-topic
+Cloud Storage Bucket: {project-id}-{env}-log-config-bucket
+Artifact Registry Repository: {project-id}-{env}-logstash-repo
+4. IAM Roles and Security
+4.1 Principle of Least Privilege
+Assign the minimal set of permissions required for each service to perform its function.
+Regularly audit IAM policies to ensure roles do not have excessive permissions.
+4.2 Service Accounts
+Dedicated Service Accounts: Each major service (e.g., Cloud Run, Pub/Sub) should have its own service account with specific roles.
+Key IAM Roles:
+Artifact Registry: roles/artifactregistry.reader for Cloud Run to pull Docker images.
+Cloud Run: roles/run.invoker for executing the service, roles/pubsub.subscriber for consuming Pub/Sub messages.
+Pub/Sub: roles/pubsub.publisher for publishing logs, roles/pubsub.subscriber for subscriptions.
+Cloud Storage: roles/storage.objectViewer for accessing bucket contents.
+4.3 Secure Access Control
+Service Account Key Management: Avoid using long-lived service account keys. Use IAM roles to manage access and rotate keys regularly if necessary.
+Network Security: Use VPC Service Controls for sensitive environments to restrict access to Google Cloud services.
+5. Resource Configuration
+5.1 Artifact Registry
+Repository Setup: Create a Docker repository in Artifact Registry using a consistent naming pattern.
+Access Permissions: Grant the necessary IAM roles to Cloud Run's service account for pulling images.
+5.2 Cloud Run
+Service Deployment:
+
+Deploy the Logstash Docker image from Artifact Registry.
+Assign the service account with the necessary IAM roles (roles/run.invoker, roles/pubsub.subscriber).
+Configure environment variables for the Cloud Run service to define Pub/Sub subscription names, Cloud Storage paths, etc.
+Auto-scaling Configuration: Set up auto-scaling based on CPU usage, memory usage, or the number of incoming Pub/Sub messages.
+
+Network Configuration: Configure VPC connectors if Cloud Run needs to access resources in a private VPC network.
+
+5.3 Pub/Sub
+Topic and Subscription Creation:
+
+Create a topic for logs, following the naming convention.
+Set up a subscription linked to this topic, granting Cloud Run’s service account roles/pubsub.subscriber.
+Consider using Dead Letter Topics (DLTs) for handling message processing failures.
+Message Retention and Delivery: Adjust message retention and acknowledgment deadlines based on expected processing times.
+
+5.4 Cloud Storage Buckets
+Bucket Creation: Set up buckets for storing Logstash configuration files and SSL certificates. Ensure bucket names are globally unique.
+IAM Configuration: Grant Cloud Run’s service account roles/storage.objectViewer for access to these files.
+Versioning and Lifecycle Management: Enable versioning for critical files and set up lifecycle rules to delete old versions after a set period.
+5.5 Logging Sink
+Creation and Configuration:
+
+Define a logging sink within the application project to capture logs and forward them to the Pub/Sub topic.
+Use filters to ensure only relevant logs are forwarded, reducing unnecessary processing.
+Assign the sink’s writer identity the roles/pubsub.publisher role to publish logs to the topic.
+Monitoring and Troubleshooting: Set up logging and monitoring to detect issues such as failed log deliveries or configuration errors.
+
+6. Monitoring and Logging
+6.1 Cloud Monitoring Integration
+Dashboards: Create Cloud Monitoring dashboards to visualize log processing metrics, including Pub/Sub message rates, Cloud Run instance performance, and error rates.
+Alert Policies: Set up alerts for critical issues, such as Pub/Sub message backlogs or Cloud Run instance failures, using Cloud Monitoring.
+6.2 Logging Configuration
+Centralized Logging: Ensure all logs from Cloud Run, Pub/Sub, and related services are forwarded to Google Cloud Logging.
+Log Retention Policies: Define log retention policies to manage storage costs while retaining essential logs for compliance.
+7. Security Best Practices
+7.1 Image Security
+Vulnerability Scanning: Regularly scan Docker images in Artifact Registry for vulnerabilities using Google Cloud’s built-in vulnerability scanning tools.
+Image Update Strategy: Keep the Logstash image updated with the latest security patches and improvements. Automate the build and deployment pipeline to streamline updates.
+7.2 Data Encryption
+Encryption at Rest: Ensure that all data stored in Cloud Storage, Pub/Sub messages, and other services are encrypted using Cloud KMS.
+Encryption in Transit: Enable HTTPS for all connections to Cloud Run, and use encrypted channels for communication between services.
+7.3 Auditing and Compliance
+IAM Audit Logs: Enable and monitor IAM audit logs to track changes to permissions and roles.
+Compliance Adherence: Regularly review and update configurations to ensure they adhere to organizational compliance requirements (e.g., GDPR, HIPAA).
+8. Disaster Recovery and High Availability
+8.1 Backup and Recovery
+Cloud Storage: Enable versioning for critical configuration files and create snapshots of important data.
+Pub/Sub: Use Dead Letter Topics and set up message retention policies to ensure no messages are lost during failures.
+8.2 High Availability
+Cloud Run: Utilize multiple regions for deployment to ensure high availability and failover capabilities.
+Pub/Sub: Configure cross-region replication for Pub/Sub topics to protect against regional outages.
+9. Conclusion
+This document outlines the steps to implement a robust, secure, and scalable log processing pipeline using Google Cloud services. By following the best practices and configurations detailed here, you can ensure that your production environment is well-prepared to handle the demands of log processing while maintaining security and compliance. Regularly review and update your infrastructure to adapt to evolving requirements and new features offered by Google Cloud.

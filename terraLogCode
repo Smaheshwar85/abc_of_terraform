@@ -1,4 +1,129 @@
 
+For your GitHub Action to pick the correct dev.tfvars file (or any environment-specific .tfvars file such as prod.tfvars), you need to explicitly pass that file as a variable using the -var-file option in the terraform commands (terraform plan and terraform apply). The tfvars file should be in the correct directory, such as terraform/environment/dev/dev.tfvars.
+
+Here’s how GitHub Actions will work with dev.tfvars:
+
+Example Structure:
+css
+Copy code
+terraform/
+  environment/
+    dev/
+      main.tf
+      dev.tfvars
+    prod/
+      main.tf
+      prod.tfvars
+GitHub Actions Workflow (with dev.tfvars):
+In the GitHub Actions workflow, the working directory will point to terraform/environment/dev, and the dev.tfvars file will be passed directly in the -var-file option when running the Terraform commands.
+
+Here’s how to ensure that dev.tfvars is picked:
+
+yaml
+Copy code
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  ENVIRONMENT: dev        # Set the environment to 'dev'
+  TFVARS_FILE: dev.tfvars  # Use the dev.tfvars file for this environment
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        version: 'latest'
+        service_account_key: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_KEY }}
+        project_id: ${{ secrets.GCLOUD_PROJECT }}
+
+    # Initialize Terraform for the 'dev' environment
+    - name: Terraform Init
+      working-directory: ./terraform/environment/${{ env.ENVIRONMENT }}
+      run: terraform init
+
+    # Plan with dev.tfvars
+    - name: Terraform Plan with dev.tfvars
+      working-directory: ./terraform/environment/${{ env.ENVIRONMENT }}
+      run: terraform plan -var-file="${{ env.TFVARS_FILE }}"
+
+    # Apply with dev.tfvars
+    - name: Terraform Apply with dev.tfvars
+      working-directory: ./terraform/environment/${{ env.ENVIRONMENT }}
+      run: terraform apply -auto-approve -var-file="${{ env.TFVARS_FILE }}"
+
+    - name: Get Region from Terraform Output
+      id: get_region
+      working-directory: ./terraform/environment/${{ env.ENVIRONMENT }}
+      run: echo "gcloud_region=$(terraform output -raw gcloud_region)" >> $GITHUB_ENV
+
+    - name: Authenticate Docker with Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.gcloud_region }}-docker.pkg.dev
+
+    - name: Get Docker Tag Template from Terraform
+      id: get_docker_tag_template
+      working-directory: ./terraform/environment/${{ env.ENVIRONMENT }}
+      run: echo "docker_tag_template=$(terraform output -raw docker_tag_template)" >> $GITHUB_ENV
+
+    - name: Set Logstash Version
+      run: echo "logstash_version=8.14.3" >> $GITHUB_ENV
+
+    - name: Generate Docker Tag
+      run: |
+        docker_tag=$(echo $(eval echo ${{ env.docker_tag_template }}))
+        echo "docker_tag=$docker_tag" >> $GITHUB_ENV
+
+    - name: Build Docker Image
+      working-directory: ./docker
+      run: |
+        docker build --build-arg logstash_version=${{ env.logstash_version }} --tag "${{ env.docker_tag }}" .
+
+    - name: Push Docker Image to Artifact Registry
+      working-directory: ./docker
+      run: |
+        docker push "${{ env.docker_tag }}"
+
+    - name: Clean up Docker images
+      run: docker rmi "${{ env.docker_tag }}" || true
+Key Points:
+Working Directory:
+
+The working-directory is set to ./terraform/environment/dev, ensuring that the Terraform commands are run in the correct environment directory (dev).
+yaml
+Copy code
+working-directory: ./terraform/environment/${{ env.ENVIRONMENT }}
+Passing dev.tfvars:
+
+The -var-file flag explicitly points to the dev.tfvars file, which contains the environment-specific variables.
+yaml
+Copy code
+terraform plan -var-file="${{ env.TFVARS_FILE }}"
+and
+yaml
+Copy code
+terraform apply -auto-approve -var-file="${{ env.TFVARS_FILE }}"
+Environment Variables:
+
+The ENVIRONMENT is set to dev, and TFVARS_FILE is set to dev.tfvars so the action picks the correct environment and file.
+If you want to change the environment, simply change the values of ENVIRONMENT and TFVARS_FILE to something like prod and prod.tfvars for production.
+Conclusion:
+This approach ensures that the GitHub Actions workflow will pick the correct dev.tfvars file for the dev environment, as it's explicitly passed in the -var-file option in both terraform plan and terraform apply commands. By changing the ENVIRONMENT and TFVARS_FILE variables, you can easily switch between environments (e.g., dev, prod, etc.).
+
+**************************************************************************************************************************************************************************************************************
 name: Build and Push Docker Image
 
 on:

@@ -1,3 +1,151 @@
+********************************************************************************************************************************************************************************
+vTo dynamically derive the Pub/Sub destination within the google_logging_project_sink resource, you can modify the Terraform code to automatically construct the destination URI based on input variables such as the project ID and the Pub/Sub topic name.
+
+Updated Module Structure
+Here’s how you can structure the module to derive the Pub/Sub destination dynamically:
+
+Add a pubsub_topic_name variable: This will allow you to pass in the Pub/Sub topic name.
+Derive the destination in locals.tf: Construct the full destination URI for Pub/Sub using the provided topic name and project ID.
+Use the derived destination in main.tf: The derived destination will be used directly in the google_logging_project_sink resource.
+1. variables.tf
+Add a new variable for the Pub/Sub topic name.
+
+hcl
+Copy code
+variable "prefix" {
+  description = "Prefix to be used for naming resources"
+  type        = string
+}
+
+variable "pubsub_topic_name" {
+  description = "The name of the Pub/Sub topic where logs will be sent"
+  type        = string
+}
+
+variable "project_id" {
+  description = "The ID of the project in which to create the log sink"
+  type        = string
+}
+
+variable "log_filter" {
+  description = "Optional filter expression for the sink (inclusion filter)"
+  type        = string
+  default     = ""
+}
+
+variable "exclusion_filters" {
+  description = "List of log exclusion filters to be applied to the sink"
+  type = list(object({
+    name        = string
+    filter      = string
+    description = string
+  }))
+  default = []
+}
+
+variable "region" {
+  description = "Region where the resources are deployed"
+  type        = string
+}
+
+variable "iam_role" {
+  description = "The IAM role to be granted to the sink service account, defaults to 'roles/pubsub.publisher'"
+  type        = string
+  default     = "roles/pubsub.publisher"
+}
+2. locals.tf
+Derive the destination URI for the Pub/Sub topic.
+
+hcl
+Copy code
+locals {
+  log_sink_name = "${var.prefix}-log-sink"
+
+  # Derive the Pub/Sub topic destination URI
+  pubsub_destination = "pubsub.googleapis.com/projects/${var.project_id}/topics/${var.pubsub_topic_name}"
+}
+3. main.tf
+Use the derived pubsub_destination as the destination in the google_logging_project_sink resource.
+
+hcl
+Copy code
+resource "google_logging_project_sink" "log_sink" {
+  name        = local.log_sink_name
+  destination = local.pubsub_destination
+  filter      = var.log_filter
+  project     = var.project_id
+
+  include_children      = false
+  unique_writer_identity = true
+}
+
+resource "google_project_iam_member" "sink_writer" {
+  project = var.project_id
+  role    = var.iam_role
+  member  = google_logging_project_sink.log_sink.writer_identity
+}
+
+resource "google_logging_project_exclusion" "log_exclusions" {
+  count = length(var.exclusion_filters)
+
+  name        = var.exclusion_filters[count.index].name
+  description = var.exclusion_filters[count.index].description
+  filter      = var.exclusion_filters[count.index].filter
+  project     = var.project_id
+}
+4. outputs.tf
+Outputs remain the same as in previous examples.
+
+hcl
+Copy code
+output "log_sink_name" {
+  description = "The name of the logging sink created"
+  value       = google_logging_project_sink.log_sink.name
+}
+
+output "log_sink_destination" {
+  description = "The destination to which the log entries are being exported"
+  value       = google_logging_project_sink.log_sink.destination
+}
+
+output "sink_writer_identity" {
+  description = "The service account identity that is used to write to the destination"
+  value       = google_logging_project_sink.log_sink.writer_identity
+}
+Example Usage
+Now, when using this module, you only need to specify the pubsub_topic_name and the module will automatically derive the full destination.
+
+hcl
+Copy code
+module "logging_sink" {
+  source      = "./path/to/your/logging-sink-module"
+  prefix      = "my-app"
+  project_id  = "my-gcp-project"
+  pubsub_topic_name = "my-topic"
+  region      = "us-central1"
+
+  # Optional: Define log filters if needed
+  log_filter = "resource.type = \"gce_instance\" AND severity >= ERROR"
+
+  # Optional: Define exclusion filters if needed
+  exclusion_filters = [
+    {
+      name        = "exclude-debug-logs"
+      filter      = "severity = DEBUG"
+      description = "Exclude all DEBUG severity logs"
+    }
+  ]
+}
+Summary
+Dynamic Pub/Sub Destination: The Pub/Sub destination URI is derived based on the project_id and pubsub_topic_name variables. This approach is flexible and allows for the destination to be easily configured at runtime.
+Simplicity: The user only needs to provide the Pub/Sub topic name and project ID; the module handles the rest.
+This approach ensures that your logging sink module is not only production-ready but also easily adaptable to different configurations and environments.
+
+*************************************************************************************************************************************************************************
+
+
+
+
 Below is an end-to-end production-ready Terraform module to create a Google Cloud Logging Sink with a destination in Pub/Sub. This module includes flexibility for different configurations, such as setting IAM roles, applying inclusion and exclusion filters, and handling Pub/Sub as the destination.
 
 Module Structure

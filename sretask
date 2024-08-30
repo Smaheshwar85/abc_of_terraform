@@ -1,3 +1,280 @@
+the clean production ready running code
+ChatGPT said:
+ChatGPT
+To organize your Terraform configuration into a production-ready structure, let's split the code into different files as requested. I'll create locals.tf, dev.tfvars, cloudrun.tf, pubsub.tf, iam.tf, variables.tf, and storage.tf.
+
+locals.tf
+This file contains local values that are commonly used across multiple resources.
+
+hcl
+Copy code
+locals {
+  name        = "your-bucket-name"  # Replace with your bucket name
+  region      = "your-region"       # Replace with your desired region
+  kms_key_name = "your-kms-key"     # Replace with your KMS key name
+
+  pipeline_content = templatefile("${path.module}/files/pipeline.conf.tmpl", {
+    project              = local.project,
+    topic                = google_pubsub_topic.main.name,
+    subscription         = google_pubsub_subscription.main.name,
+    opensearch_password  = var.opensearch_password
+  })
+  
+  pipeline_hash = sha256(local.pipeline_content)
+  project       = data.google_project.main.id
+  docker_image  = "your-docker-image"  # Replace with your Docker image
+  memory        = 512  # Memory in MB
+  labels        = { "env" = "production" }  # Customize labels as needed
+}
+dev.tfvars
+This file contains the variables specific to your development environment. It is generally used to override defaults.
+
+hcl
+Copy code
+name          = "your-dev-bucket-name"
+region        = "your-dev-region"
+kms_key_name  = "your-dev-kms-key"
+docker_image  = "your-dev-docker-image"
+opensearch_password = "your-opensearch-password"  # Sensitive value
+cloudrun.tf
+This file contains the Cloud Run service definition.
+
+hcl
+Copy code
+resource "google_cloud_run_v2_service" "main" {
+  provider        = google-beta
+  name            = local.name
+  location        = local.region
+  launch_stage    = "BETA"
+  ingress         = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  scaling {
+    main_instance_count = 1
+  }
+
+  template {
+    execution_environment = "EXECUTION_ENVIRONMENT_GEN2"
+    labels                = local.labels
+    encryption_key        = local.kms_key_name
+    service_account       = google_service_account.cloudrun.email
+    timeout               = "30s"
+
+    scaling {
+      max_instance_count = 1
+      min_instance_count = 1
+    }
+
+    containers {
+      image = local.docker_image
+
+      volume_mounts {
+        name       = "logstash-pipeline"
+        mount_path = "/usr/share/logstash/pipeline/"
+      }
+
+      ports {
+        name          = "http1"
+        container_port = 8080
+      }
+
+      env {
+        name  = "LS_JAVA_OPTS"
+        value = "Xmx${local.memory}m"
+      }
+
+      env {
+        name  = "LOG_LEVEL"
+        value = "info"
+      }
+
+      env {
+        name  = "MONITORING_ENABLED"
+        value = "true"
+      }
+
+      env {
+        name  = "PIPELINE_WORKERS"
+        value = "4"
+      }
+
+      env {
+        name  = "PIPELINE_BATCH_SIZE"
+        value = "250"
+      }
+
+      env {
+        name  = "PIPELINE_BATCH_DELAY"
+        value = "50"
+      }
+
+      env {
+        name  = "PIPELINE_HASH"
+        value = local.pipeline_hash
+      }
+
+      resources {
+        cpu_idle = false
+        limits {
+          cpu    = "100m"
+          memory = "512Mi"
+        }
+      }
+
+      startup_probe {
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+
+        http_get {
+          path = "/"
+          port = 8080
+        }
+      }
+
+      liveness_probe {
+        initial_delay_seconds = 10
+        period_seconds        = 5
+        timeout_seconds       = 1
+        failure_threshold     = 3
+        success_threshold     = 1
+
+        http_get {
+          path = "/"
+          port = 8080
+        }
+      }
+    }
+
+    volumes {
+      name = "logstash-pipeline"
+      gcs {
+        bucket     = google_storage_bucket.main.name
+        read_only  = true
+      }
+    }
+
+    vpc_access {
+      egress    = "ALL_TRAFFIC"
+      connector = data.google_vpc_access_connector.main.id
+    }
+  }
+
+  depends_on = [
+    google_storage_bucket_object.main
+  ]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "main" {
+  for_each = toset(["xxxx@gmail.com"])  # Update with actual users
+  name     = google_cloud_run_v2_service.main.name
+  role     = "roles/run.invoker"
+  member   = "user:${each.value}"
+}
+pubsub.tf
+This file defines the Pub/Sub topic and subscription.
+
+hcl
+Copy code
+resource "google_pubsub_topic" "main" {
+  name              = local.name
+  kms_key_name      = local.kms_key_name
+  message_retention_duration = "3600s"
+
+  message_storage_policy {
+    allowed_persistence_regions = [local.region]
+  }
+}
+
+resource "google_pubsub_subscription" "main" {
+  name                     = local.name
+  topic                    = google_pubsub_topic.main.name
+  ack_deadline_seconds     = 20
+  message_retention_duration = "3600s"
+}
+iam.tf
+This file manages IAM roles and permissions.
+
+hcl
+Copy code
+resource "google_service_account" "cloudrun" {
+  account_id = "logging-octa"
+}
+
+resource "google_pubsub_subscription_iam_member" "cloudrun" {
+  subscription = google_pubsub_subscription.main.id
+  member       = "serviceAccount:${google_service_account.cloudrun.email}"
+  role         = "roles/pubsub.subscriber"
+}
+
+resource "google_storage_bucket_iam_member" "cloudrun" {
+  bucket = google_storage_bucket.main.id
+  member = "serviceAccount:${google_service_account.cloudrun.email}"
+  role   = "roles/storage.objectViewer"
+}
+
+data "google_project" "main" {}
+
+resource "google_pubsub_topic_iam_member" "sink" {
+  topic  = google_pubsub_topic.main.id
+  member = "serviceAccount:service-${data.google_project.main.number}@gcp-sa-logging.iam.gserviceaccount.com"
+  role   = "roles/pubsub.publisher"
+}
+storage.tf
+This file defines the GCS bucket and bucket object.
+
+hcl
+Copy code
+resource "google_storage_bucket" "main" {
+  name                        = local.name
+  location                    = local.region
+  uniform_bucket_level_access = true
+
+  encryption {
+    default_kms_key_name = local.kms_key_name
+  }
+}
+
+resource "google_storage_bucket_object" "main" {
+  name    = "config.yaml"
+  content = local.pipeline_content
+  bucket  = google_storage_bucket.main.name
+}
+variables.tf
+This file defines the variables for your configuration.
+
+hcl
+Copy code
+variable "opensearch_password" {
+  description = "This password is for OpenSearch"
+  type        = string
+  sensitive   = true
+}
+Summary
+locals.tf: Contains reusable local values.
+dev.tfvars: Holds environment-specific configurations.
+cloudrun.tf: Defines Cloud Run resources.
+pubsub.tf: Manages Pub/Sub topics and subscriptions.
+iam.tf: Configures IAM roles and permissions.
+storage.tf: Defines GCS buckets and objects.
+variables.tf: Holds sensitive and configurable variables.
+Make sure to replace placeholders like "your-bucket-name", "your-region", "your-kms-key", and "your-docker-image" with actual values. This setup should be production-ready and organized.
+
+
+
+
+
+
+
+======================================================================================================================================================
+
+
+
+
+
+
+
 Writing Terraform Code for Infrastructure:
 
 Develop Terraform scripts to define, provision, and manage reproducible cloud infrastructure.

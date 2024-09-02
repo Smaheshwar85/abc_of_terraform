@@ -1,0 +1,99 @@
+CI/CD Pipeline for Logstash with GitHub Actions
+Overview
+This document outlines the CI/CD pipeline implemented for Logstash, focusing on building Docker images and pushing them to an Artifactory repository using GitHub Actions. The pipeline ensures that the latest versions of Logstash are automatically built and deployed to our Docker registry, streamlining the process of managing Logstash deployments across environments.
+
+Table of Contents
+Overview
+Pipeline Architecture
+GitHub Actions Workflow
+Docker Image Management
+Artifactory Integration
+OpenSearch Credentials Handling
+How to Trigger the Pipeline
+Conclusion
+Pipeline Architecture
+The pipeline is built around GitHub Actions, which automates the process of building and pushing Docker images for Logstash. The workflow is triggered by changes in the repository and carries out the following tasks:
+
+Build: Constructs the Docker image for Logstash using the specified version.
+Authenticate: Authenticates with Google Cloud and Docker to enable secure access to the Artifactory.
+Push: Pushes the built Docker image to the specified Artifactory repository.
+GitHub Actions Workflow
+The GitHub Actions workflow is defined in a YAML file located in the .github/workflows/ directory of the repository. The workflow is triggered on a push or pull_request to the main branch.
+
+Key Steps in the Workflow:
+Checkout Code: Pulls the latest code from the repository.
+Set Up Google Cloud SDK: Configures the environment to interact with Google Cloud, necessary for Docker authentication.
+Build Docker Image: Uses a Dockerfile to build the Logstash image, including specific configurations such as the Logstash version.
+Authenticate Docker: Authenticates Docker with Google Artifact Registry to allow pushing the built image.
+Push Docker Image: The Docker image is tagged and pushed to the Artifactory.
+Example Workflow YAML:
+yaml
+Copy code
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Google Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        version: 'latest'
+        service_account_key: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_KEY }}
+        project_id: ${{ secrets.GCLOUD_PROJECT }}
+
+    - name: Build Docker Image
+      working-directory: ./docker
+      run: |
+        docker build --build-arg logstash_version=8.14.3 --tag "europe-west3-docker.pkg.dev/project-id/repository-name/logstash:latest" .
+
+    - name: Authenticate Docker with Artifact Registry
+      run: |
+        gcloud auth configure-docker europe-west3-docker.pkg.dev
+
+    - name: Push Docker Image to Artifact Registry
+      run: |
+        docker push "europe-west3-docker.pkg.dev/project-id/repository-name/logstash:latest"
+Docker Image Management
+The Docker image for Logstash is built using the Dockerfile located in the /docker directory. The image includes a specific version of Logstash, which can be modified by changing the logstash_version build argument. After the image is built, it is tagged appropriately and pushed to Artifactory.
+
+Key Configurations:
+Logstash Version: This is set using the logstash_version build argument.
+Docker Tag: The image is tagged with the latest version or a specific version number before being pushed.
+Artifactory Integration
+The pipeline uses Google Artifact Registry to store Docker images. The registry ensures that all Docker images are stored securely and are accessible across different environments.
+
+Steps:
+Authenticate Docker: The workflow authenticates with Google Artifact Registry to gain access.
+Push Image: The Docker image is pushed to the Artifactory under a specific repository, ensuring it is available for deployment.
+OpenSearch Credentials Handling
+Sensitive credentials, such as the OpenSearch password, are managed securely using GitHub Secrets. These secrets are injected into the workflow at runtime to ensure that they are never exposed in the codebase.
+
+Handling OpenSearch Password:
+The OpenSearch password is stored as a GitHub Secret named OPENSEARCH_PASSWORD.
+This secret is accessed in the workflow when needed, especially during Docker build or Terraform commands that require authentication.
+yaml
+Copy code
+- name: Set OpenSearch Credentials
+  run: |
+    echo "export TF_VAR_opensearch_username='logitech'" >> $GITHUB_ENV
+    echo "export TF_VAR_opensearch_password='${{ secrets.OPENSEARCH_PASSWORD }}'" >> $GITHUB_ENV
+How to Trigger the Pipeline
+The pipeline is triggered automatically on:
+
+Push to Main Branch: Any code changes pushed to the main branch.
+Pull Requests: Opening or updating a pull request against the main branch.
+Conclusion
+The CI/CD pipeline for Logstash automates the building and deployment process, ensuring that the latest configurations are always up-to-date in the Artifactory. By integrating GitHub Actions, Docker, and Google Artifact Registry, the process is both secure and efficient, enabling continuous delivery of updates with minimal manual intervention.

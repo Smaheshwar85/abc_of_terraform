@@ -38,18 +38,7 @@ Either of these methods will work depending on your preference.
 
 
 
-You said:
-locals {
 
- log_sink_name = "${var.application_name}-log-sink
- 
- pubsub_topic_name = "abc_pubsub_mstech_dev_logging_topic"
- 
- central_project_id ="abc-mstech-loggig-dev-b2c26736f"
- 
- pubsub_destination = "pubsub.googleapis.com/project/${local.central_project_id}"/topics/${local.pusub_topic_name}"
- 
- }
  
  here we want to add some random_id with the log-sink name so that we can create many log sinks
  define variable in local and create a hasmap where key stages like dev,test,qa,prod and value will be there corrosponding project ids  so we can pass the respective project in central _project_id 

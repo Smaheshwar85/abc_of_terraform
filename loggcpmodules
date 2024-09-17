@@ -1,3 +1,45 @@
+
+
+locals {
+  service_accounts = [
+    "service-account-1@project-id.iam.gserviceaccount.com",
+    "service-account-2@project-id.iam.gserviceaccount.com"
+  ]
+  roles = [
+    "roles/editor",
+    "roles/viewer"
+  ]
+}
+
+resource "google_project_iam_member" "service_account_roles" {
+  for_each = { for combo in setproduct(local.service_accounts, local.roles) : "${combo[0]}-${combo[1]}" => {
+    service_account = combo[0]
+    role            = combo[1]
+  }}
+
+  project = "project-id"
+  member  = "serviceAccount:${each.value.service_account}"
+  role    = each.value.role
+}
+
+
+
+
+
+
+
+
+
+
+
+===================================================================================================================================
+
+
+
+
+
+
+
 creating the sink in the application project with the correct writer identity, we need to structure the Terraform configuration as follows:
 
 Updated Structure

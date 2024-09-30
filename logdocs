@@ -1,4 +1,80 @@
+import time
+import logging
+from google.cloud import logging as gcp_logging
+from opentelemetry import metrics
+from opentelemetry.exporter.cloud_monitoring import CloudMonitoringMetricsExporter
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 
+# Initialize Google Cloud Logging client
+gcp_client = gcp_logging.Client()
+gcp_handler = gcp_logging.handlers.CloudLoggingHandler(gcp_client)
+logging.basicConfig(level=logging.INFO, handlers=[gcp_handler])
+logger = logging.getLogger(__name__)
+
+# Initialize OpenTelemetry MeterProvider without custom resource
+metrics.set_meter_provider(
+    MeterProvider(
+        metric_readers=[
+            PeriodicExportingMetricReader(
+                CloudMonitoringMetricsExporter(), export_interval_millis=5000
+            )
+        ]
+    )
+)
+
+meter = metrics.get_meter(__name__)
+
+# Creates metric workload.googleapis.com/iam_error_counter with monitored resource generic_task
+iam_error_counter = meter.create_counter(
+    name="iam_error_counter",
+    description="Number of IAM errors",
+    unit="1",
+)
+
+# Define labels for the environment
+staging_labels = {"environment": "staging"}
+
+# Function to check for IAM errors in logs
+def check_for_iam_errors():
+    logger.info("Checking for IAM errors...")
+
+    # Create a filter to fetch logs related to IAM errors for any resource
+    filter_str = 'severity="ERROR" AND textPayload:"IAM"'
+
+    # Fetch logs
+    # Use the existing logger defined at the module level
+    for entry in gcp_client.logger("IAM_Error_Logger").list_entries(filter_=filter_str):
+        # Increment the IAM error counter if an error entry is found
+        iam_error_counter.add(1, staging_labels)
+        logger.info(f"IAM error detected: {entry.payload}")
+
+# Loop to check for IAM errors every 5 seconds
+while True:
+    check_for_iam_errors()
+    time.sleep(5)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+===============================================================================================================================================
 To create a metric that captures IAM errors for any resource type in Google Cloud, you can adjust the filter string in your code to be more generic. This means removing the specific resource.type="gce_instance" condition from the filter.
 
 Here’s the updated code with a more generic IAM error log filter:

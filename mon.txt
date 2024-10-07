@@ -1,3 +1,186 @@
+To help with debugging, I’ll add print statements at various points in the code to log key information and track the flow of execution. These prints will give insights into the creation of clients, initialization of meters, the detection of IAM errors, and any potential failures.
+
+Here’s the modified code with print statements for debugging:
+
+Debugging Version of the Code:
+
+import os
+import sys
+import time
+import logging
+from google.api_core.client_options import ClientOptions
+from google.cloud.monitoring import MetricServiceClient
+from google.cloud import logging as gcp_logging  # Import Google Cloud Logging
+from opentelemetry import metrics
+from opentelemetry.exporter.cloud_monitoring import CloudMonitoringMetricsExporter
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.resources import (
+    get_aggregated_resources,
+    ProcessResourceDetector
+)
+
+# Fetch project ID and service account file for Monitoring API
+GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "your-project-id")
+SA_FILENAME = os.getenv("SA_FILENAME", "path/to/service-account-file.json")
+
+# Define Monitoring API endpoint
+MONITORING_API_ENDPOINT = os.getenv("MONITORING_API_ENDPOINT", "https://monitoring.googleapis.com")
+LOGGING_API_ENDPOINT = os.getenv("LOGGING_API_ENDPOINT", "https://logging.googleapis.com")
+
+# Function to create and return Metrics and Logging clients using client options
+def create_clients(api_endpoint: str, logging_endpoint: str, sa_filename: str) -> (MetricServiceClient, gcp_logging.Client):
+    print(f"Creating clients with API endpoint: {api_endpoint} and Logging endpoint: {logging_endpoint}")
+    
+    # Set client options with service account credentials and custom API endpoints
+    metrics_options = ClientOptions(credentials_file=sa_filename, api_endpoint=api_endpoint)
+    logging_options = ClientOptions(credentials_file=sa_filename, api_endpoint=logging_endpoint)
+    
+    # Create MetricServiceClient
+    print("Initializing MetricServiceClient...")
+    metrics_client = MetricServiceClient(client_options=metrics_options)
+    print("MetricServiceClient created successfully.")
+
+    # Create Google Cloud Logging client with custom options
+    print("Initializing Google Cloud Logging client...")
+    logging_client = gcp_logging.Client(client_options=logging_options)
+    print("Google Cloud Logging client created successfully.")
+
+    return metrics_client, logging_client
+
+# Function to create and configure OpenTelemetry's Meter with Cloud Monitoring Metrics Exporter
+def get_meter(
+    api_endpoint: str = MONITORING_API_ENDPOINT,
+    logging_endpoint: str = LOGGING_API_ENDPOINT,
+    project_id: str = GOOGLE_CLOUD_PROJECT,
+    sa_filename: str = SA_FILENAME,
+) -> (metrics.Meter, gcp_logging.Client):
+    print("Getting meter and logging client...")
+    
+    # Initialize MetricServiceClient and Logging client
+    metrics_client, logging_client = create_clients(api_endpoint, logging_endpoint, sa_filename)
+    
+    print("Setting up MeterProvider with Cloud Monitoring exporter...")
+    
+    # Set up the meter provider with Cloud Monitoring exporter and resource detectors
+    metrics.set_meter_provider(
+        MeterProvider(
+            metric_readers=[
+                PeriodicExportingMetricReader(
+                    CloudMonitoringMetricsExporter(
+                        project_id=project_id,
+                        client=metrics_client  # Pass the monitoring client to the exporter
+                    ),
+                    export_interval_millis=5000,  # Export interval set to 5 seconds
+                )
+            ],
+            resource=get_aggregated_resources(
+                [ProcessResourceDetector(raise_on_error=True)]  # Add process resources
+            ),
+        )
+    )
+    print("MeterProvider setup completed.")
+    
+    meter = metrics.get_meter(__name__)  # Return the configured meter
+    print("Meter created successfully.")
+    
+    return meter, logging_client
+
+# Function to get additional metrics properties (can be extended as needed)
+def get_metrics_properties():
+    environment = os.getenv("MONITORING_ENV", "staging")
+    print(f"Metrics properties - environment: {environment}")
+    
+    return {
+        "environment": environment,
+    }
+
+# Function to create OpenTelemetry instruments (counter for IAM errors)
+def get_instruments():
+    print("Getting instruments (IAM error counter)...")
+    
+    meter, logging_client = get_meter()
+    
+    # Create IAM error counter with dynamic name and description
+    counter_name = os.getenv("MONITORING_METRICS_IAM_ERROR_COUNTER_NAME", "iam_error_counter")
+    counter_description = os.getenv("MONITORING_METRICS_IAM_ERROR_COUNTER_DESCRIPTION", "Tracks IAM errors")
+    print(f"Creating IAM error counter: {counter_name}, description: {counter_description}")
+    
+    iam_error_counter = meter.create_counter(
+        name=counter_name,
+        description=counter_description,
+    )
+    
+    print("IAM error counter created successfully.")
+    
+    return iam_error_counter, logging_client
+
+# Function to check for IAM errors in logs and increment the counter
+def check_for_iam_errors(iam_error_counter, logging_client):
+    logger = logging.getLogger(__name__)
+    logger.addHandler(gcp_logging.handlers.CloudLoggingHandler(logging_client))
+    logger.info("Checking for IAM errors...")
+    print("Checking for IAM errors in logs...")
+    
+    # Create a filter to fetch logs related to IAM errors for any resource
+    filter_str = 'severity="ERROR" AND textPayload:"IAM"'
+    print(f"Log filter used: {filter_str}")
+    
+    # Fetch logs with the filter for IAM errors
+    for entry in logging_client.logger("IAM_Error_Logger").list_entries(filter_=filter_str):
+        print(f"IAM error detected in log: {entry.payload}")
+        
+        # Increment the IAM error counter if an error entry is found
+        labels = get_metrics_properties()  # Add custom labels
+        iam_error_counter.add(1, labels)
+        logger.info(f"IAM error detected: {entry.payload}")
+
+# Main loop to check for IAM errors and update metrics periodically
+def main():
+    print("Starting the main loop...")
+    
+    # Get the IAM error counter instrument and logging client
+    iam_error_counter, logging_client = get_instruments()
+    
+    # Loop to check for IAM errors every 5 seconds
+    while True:
+        print("Running IAM error check cycle...")
+        check_for_iam_errors(iam_error_counter, logging_client)
+        time.sleep(5)
+        print("Sleeping for 5 seconds before the next check...")
+
+if __name__ == "__main__":
+    main()
+
+Debugging Steps:
+
+	1.	Client Creation:
+	•	Prints when the MetricServiceClient and Google Cloud Logging client are being initialized and created.
+	•	Helps confirm whether the client creation is successful.
+	2.	Meter Setup:
+	•	Added prints to indicate when the MeterProvider is being set up and whether it was successful.
+	•	Ensures that OpenTelemetry’s meter is properly configured.
+	3.	Instrument Creation:
+	•	Added prints before and after the IAM error counter is created, showing the counter name and description.
+	•	Confirms the instrument’s creation and any issues with the counter.
+	4.	Log Fetching:
+	•	Prints details of the log filter used to search for IAM-related errors.
+	•	For every log entry found, the detected IAM error is printed.
+	5.	Main Loop:
+	•	Added prints to log each iteration of the loop, showing when the IAM error check is run and when the program sleeps for 5 seconds.
+
+How to Use This for Debugging:
+
+	•	Run the code and monitor the printed statements in the console.
+	•	These print statements will help identify where any errors occur and verify that the clients, meter, and instruments are created and functioning as expected.
+	•	The printed log entries can also be checked to see whether IAM errors are detected and how they are being processed.
+
+This should help in pinpointing issues if the code is not behaving as expected.
+₹₹₹₹₹₹₹₹₹₹₹&&&&&&&&&&&&&&&&
+
+
+
+
 import os
 import sys
 import time

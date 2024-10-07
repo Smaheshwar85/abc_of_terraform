@@ -1,3 +1,117 @@
+import os
+import sys
+import time
+import logging
+from google.api_core.client_options import ClientOptions
+from google.cloud.monitoring import MetricServiceClient
+from google.cloud import logging as gcp_logging  # Import Google Cloud Logging
+from opentelemetry import metrics
+from opentelemetry.exporter.cloud_monitoring import CloudMonitoringMetricsExporter
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.resources import (
+    get_aggregated_resources,
+    ProcessResourceDetector
+)
+
+# Fetch project ID and service account file for Monitoring API
+GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "your-project-id")
+SA_FILENAME = os.getenv("SA_FILENAME", "path/to/service-account-file.json")
+
+# Define Monitoring API endpoint
+MONITORING_API_ENDPOINT = os.getenv("MONITORING_API_ENDPOINT", "https://monitoring.googleapis.com")
+LOGGING_API_ENDPOINT = os.getenv("LOGGING_API_ENDPOINT", "https://logging.googleapis.com")
+
+# Function to create and return Metrics and Logging clients using client options
+def create_clients(api_endpoint: str, logging_endpoint: str, sa_filename: str) -> (MetricServiceClient, gcp_logging.Client):
+    # Set client options with service account credentials and custom API endpoints
+    metrics_options = ClientOptions(credentials_file=sa_filename, api_endpoint=api_endpoint)
+    logging_options = ClientOptions(credentials_file=sa_filename, api_endpoint=logging_endpoint)
+
+    # Create MetricServiceClient
+    metrics_client = MetricServiceClient(client_options=metrics_options)
+
+    # Create Google Cloud Logging client with custom options
+    logging_client = gcp_logging.Client(client_options=logging_options)
+
+    return metrics_client, logging_client
+
+# Function to create and configure OpenTelemetry's Meter with Cloud Monitoring Metrics Exporter
+def get_meter(
+    api_endpoint: str = MONITORING_API_ENDPOINT,
+    logging_endpoint: str = LOGGING_API_ENDPOINT,
+    project_id: str = GOOGLE_CLOUD_PROJECT,
+    sa_filename: str = SA_FILENAME,
+) -> (metrics.Meter, gcp_logging.Client):
+    # Initialize MetricServiceClient and Logging client
+    metrics_client, logging_client = create_clients(api_endpoint, logging_endpoint, sa_filename)
+
+    # Set up the meter provider with Cloud Monitoring exporter and resource detectors
+    metrics.set_meter_provider(
+        MeterProvider(
+            metric_readers=[
+                PeriodicExportingMetricReader(
+                    CloudMonitoringMetricsExporter(
+                        project_id=project_id,
+                        client=metrics_client  # Pass the monitoring client to the exporter
+                    ),
+                    export_interval_millis=5000,  # Export interval set to 5 seconds
+                )
+            ],
+            resource=get_aggregated_resources(
+                [ProcessResourceDetector(raise_on_error=True)]  # Add process resources
+            ),
+        )
+    )
+    meter = metrics.get_meter(__name__)  # Return the configured meter
+    return meter, logging_client
+
+# Function to get additional metrics properties (can be extended as needed)
+def get_metrics_properties():
+    return {
+        "environment": os.getenv("MONITORING_ENV", "staging"),
+    }
+
+# Function to create OpenTelemetry instruments (counter for IAM errors)
+def get_instruments():
+    meter, _ = get_meter()
+
+    # Create IAM error counter with dynamic name and description
+    iam_error_counter = meter.create_counter(
+        name=os.getenv("MONITORING_METRICS_IAM_ERROR_COUNTER_NAME", "iam_error_counter"),
+        description=os.getenv("MONITORING_METRICS_IAM_ERROR_COUNTER_DESCRIPTION", "Tracks IAM errors"),
+    )
+
+    return iam_error_counter
+
+# Function to check for IAM errors in logs and increment the counter
+def check_for_iam_errors(iam_error_counter, logging_client):
+    logger = logging.getLogger(__name__)
+    logger.addHandler(gcp_logging.handlers.CloudLoggingHandler(logging_client))
+    logger.info("Checking for IAM errors...")
+
+    # Create a filter to fetch logs related to IAM errors for any resource
+    filter_str = 'severity="ERROR" AND textPayload:"IAM"'
+
+    # Fetch logs with the filter for IAM errors
+    for entry in logging_client.logger("IAM_Error_Logger").list_entries(filter_=filter_str):
+        # Increment the IAM error counter if an error entry is found
+        labels = get_metrics_properties()  # Add custom labels
+        iam_error_counter.add(1, labels)
+        logger.info(f"IAM error detected: {entry.payload}")
+
+# Main loop to check for IAM errors and update metrics periodically
+def main():
+    # Get the IAM error counter instrument and logging client
+    iam_error_counter, logging_client = get_instruments()
+
+    # Loop to check for IAM errors every 5 seconds
+    while True:
+        check_for_iam_errors(iam_error_counter, logging_client)
+        time.sleep(5)
+
+if __name__ == "__main__":
+    main()
 Here's how you can update your IAM error metric code by integrating it with the structure of the provided code, using Google Cloud's MetricServiceClient, OpenTelemetry, and dynamically setting the metric names and descriptions.
 
 Updated IAM Error Metric Code

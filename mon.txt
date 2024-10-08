@@ -1,3 +1,9 @@
+
+"By default, Google Cloud Logging writes logs into two buckets: _default and _required. We have disabled the _default bucket and routed logs to a custom log sink, but we cannot disable the _required log bucket, as it is not permitted in Google Cloud. However, we can ensure there is no duplication of logs in either OpenSearch or Google Cloud. Currently, we are sending the _required logs, which primarily contain audit-related information, to OpenSearch."
+
+
+============================================================================================================================================================
+
 To help with debugging, I’ll add print statements at various points in the code to log key information and track the flow of execution. These prints will give insights into the creation of clients, initialization of meters, the detection of IAM errors, and any potential failures.
 
 Here’s the modified code with print statements for debugging:

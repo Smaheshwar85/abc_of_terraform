@@ -1,3 +1,91 @@
+"""""""""""""@@
+import os
+import time
+from google.auth.transport.requests import Request
+from google.cloud import logging as gcp_logging
+from google.cloud.monitoring_v3 import MetricServiceClient
+from google.oauth2 import service_account
+from google.api_core.exceptions import GoogleAPICallError, ServiceUnavailable
+from datetime import datetime, timedelta
+
+# Define scopes required for logging and monitoring
+SCOPES = [
+    'https://www.googleapis.com/auth/logging.read',
+    'https://www.googleapis.com/auth/monitoring',
+]
+
+# Fetch project ID and service account file for Logging and Monitoring API
+GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "your-project-id")
+SA_FILENAME = os.getenv("SA_FILENAME", "path/to/service-account-file.json")
+
+# Function to create and return a Logging client using service account credentials
+def get_logging_client(sa_filename: str, project_id: str):
+    credentials = service_account.Credentials.from_service_account_file(sa_filename, scopes=SCOPES)
+    logging_client = gcp_logging.Client(credentials=credentials, project=project_id)
+    return logging_client
+
+# Function to create and return a MetricServiceClient using service account credentials
+def get_monitoring_client(sa_filename: str):
+    credentials = service_account.Credentials.from_service_account_file(sa_filename, scopes=SCOPES)
+    return MetricServiceClient(credentials=credentials)
+
+# Function to list log entries with retry logic
+def list_entries_with_retries(logging_client, filter_str, max_retries=5, timeout=120):
+    for attempt in range(max_retries):
+        try:
+            print(f"Attempting to list entries (Attempt {attempt + 1}/{max_retries})...")
+            entries = list(logging_client.list_entries(filter_=filter_str, timeout=timeout))
+            return entries
+        except (GoogleAPICallError, ServiceUnavailable) as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                sleep_time = 2 ** attempt  # Exponential backoff
+                print(f"Retrying in {sleep_time} seconds...")
+                time.sleep(sleep_time)
+            else:
+                print("Max retries exceeded. Raising exception.")
+                raise  # Raise error if max retries reached
+
+# Function to check for IAM errors in logs and process them
+def check_for_iam_errors(logging_client):
+    print("Checking for IAM errors...")
+
+    # Specify a time range for the filter
+    now = datetime.utcnow()
+    start_time = now - timedelta(minutes=5)
+    end_time = now
+
+    # Create a filter to fetch logs related to IAM errors
+    filter_str = (
+        f'severity="ERROR" AND textPayload:"IAM" '
+        f'AND timestamp>="{start_time.isoformat()}Z" AND timestamp<="{end_time.isoformat()}Z"'
+    )
+
+    # Fetch logs with the filter for IAM errors
+    try:
+        entries = list_entries_with_retries(logging_client, filter_str)
+        for entry in entries:
+            # Process the IAM error entry (you can add your logic here)
+            print(f"IAM error detected: {entry.payload}")
+    except Exception as e:
+        print(f"Failed to list entries: {e}")
+
+# Main loop to check for IAM errors
+def main():
+    # Initialize the logging client
+    logging_client = get_logging_client(SA_FILENAME, GOOGLE_CLOUD_PROJECT)
+    
+    # Check for IAM errors every 5 seconds
+    while True:
+        check_for_iam_errors(logging_client)
+        time.sleep(5)
+
+if __name__ == "__main__":
+    main()
+
+
+
+@@&@@@@@@@@@@@@@@@@@@@
 
 "By default, Google Cloud Logging writes logs into two buckets: _default and _required. We have disabled the _default bucket and routed logs to a custom log sink, but we cannot disable the _required log bucket, as it is not permitted in Google Cloud. However, we can ensure there is no duplication of logs in either OpenSearch or Google Cloud. Currently, we are sending the _required logs, which primarily contain audit-related information, to OpenSearch."
 

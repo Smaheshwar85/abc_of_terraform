@@ -1,3 +1,16 @@
+# Assert that Workload Identity User IAM role is assigned to the Kubernetes service account at the service account level
+  assert {
+    condition     = google_service_account_iam_member.metric_reader_viewer.role == "roles/iam.workloadIdentityUser"
+    error_message = "Workload Identity User role not correctly assigned."
+  }
+
+  # Assert that the `member` for Workload Identity User includes the correct Kubernetes service account
+  assert {
+    condition     = google_service_account_iam_member.metric_reader_viewer.member == "serviceAccount:jproject234.bc.id.googlecloud[grafana-monitoring/metric_reader]"
+    error_message = "Workload Identity User member string is incorrect."
+  }
+
+
 hcl
 Copy code
 resource "google_service_account" "metric_reader" {

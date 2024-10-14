@@ -1,3 +1,293 @@
+hcl
+Copy code
+resource "google_service_account" "metric_reader" {
+  account_id   = var.account_id
+  project_id   = var.project_id
+  display_name = var.display_name
+}
+
+resource "google_project_iam_member" "metric_reader_viewer" {
+  project_id = var.project_id
+  role       = "roles/monitoring.viewer"
+  member     = "serviceAccount:${google_service_account.metric_reader.email}"
+}
+
+resource "google_project_iam_member" "workload_identity_user" {
+  project_id      = var.project_id
+  role            = "roles/iam.workloadIdentityUser"
+  member          = "serviceAccount:${var.cluster_project_id}.svc.id.goog[${var.k8s_namespace}/${var.metric_reader_k8s_account}]"
+}
+
+# Output service account email
+output "service_account_email" {
+  value = google_service_account.metric_reader.email
+}
+
+output "service_account_name" {
+  value = google_service_account.metric_reader.name
+}
+Variables: service_account_module/variables.tf
+hcl
+Copy code
+variable "account_id" {
+  description = "The account id for the service account"
+  type        = string
+}
+
+variable "project_id" {
+  description = "The GCP project id"
+  type        = string
+}
+
+variable "display_name" {
+  description = "The display name for the service account"
+  type        = string
+  default     = "Grafana Service Account"
+}
+
+variable "cluster_project_id" {
+  description = "The cluster project id where the workload identity will be used"
+  type        = string
+}
+
+variable "k8s_namespace" {
+  description = "The Kubernetes namespace where the service account resides"
+  type        = string
+}
+
+variable "metric_reader_k8s_account" {
+  description = "The name of the Kubernetes service account"
+  type        = string
+}
+Example Usage for an Application: application/main.tf
+hcl
+Copy code
+module "grafana_service_account" {
+  source = "../service_account_module"
+
+  account_id                = "grafana-metric-reader"
+  project_id                = "abc123"
+  display_name              = "Grafana Metric Reader Service Account"
+  cluster_project_id        = "jproject234"
+  k8s_namespace             = "grafana-monitoring"
+  metric_reader_k8s_account = "metric_reader"
+}
+Test Configuration: basic.tftest.hcl
+hcl
+Copy code
+module "test_grafana_service_account" {
+  source = "./service_account_module"
+
+  account_id                = "test-metric-reader"
+  project_id                = "test-project-id"
+  display_name              = "Test Metric Reader"
+  cluster_project_id        = "test-cluster-project-id"
+  k8s_namespace             = "test-namespace"
+  metric_reader_k8s_account = "test-metric-reader"
+}
+
+output "service_account_email" {
+  value = module.test_grafana_service_account.service_account_email
+}
+
+output "service_account_name" {
+  value = module.test_grafana_service_account.service_account_name
+}
+How to Test
+To run the test, execute the following command in the folder where basic.tftest.hcl resides:
+
+bash
+Copy code
+terraform init
+terraform apply
+This setup ensures that the module is reusable and flexible for different applications, and the tftest.hcl allows for basic testing to validate that the service account and IAM bindings are created correctly.
+
+
+
+
+
+
+You said:
+create a test file using run "basic_apply_valid_variables"
+ChatGPT said:
+ChatGPT
+To create a test file using terraform's tftest framework and running basic_apply_valid_variables, here’s how you can structure the test file to verify that the module is working correctly. The test will ensure that valid inputs lead to a successful creation of the resources.
+
+Test File: test_service_account.tf
+hcl
+Copy code
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 4.0"
+    }
+  }
+}
+
+# Define the test function for applying the valid variables
+tftest "basic_apply_valid_variables" {
+  test_name = "Basic apply with valid variables"
+  
+  # Load variables from a valid configuration
+  variables = {
+    account_id                = "test-metric-reader"
+    project_id                = "test-project-id"
+    display_name              = "Test Metric Reader"
+    cluster_project_id        = "test-cluster-project-id"
+    k8s_namespace             = "test-namespace"
+    metric_reader_k8s_account = "test-metric-reader"
+  }
+
+  # Expected outputs
+  expected_outputs = {
+    service_account_email = "test-metric-reader@test-project-id.iam.gserviceaccount.com"
+    service_account_name  = "projects/test-project-id/serviceAccounts/test-metric-reader@test-project-id.iam.gserviceaccount.com"
+  }
+
+  # Execute basic apply
+  apply = true
+}
+Explanation:
+Variables: The variables block in the tftest uses the expected values as input for your module. You can replace these with other valid data if needed for further testing.
+Expected Outputs: These values are what you expect the module to output after applying the basic_apply_valid_variables test. Make sure they are accurate to your setup (e.g., the project ID and account ID).
+Apply: The test will apply the configuration using the provided variables.
+Running the Test
+You can run this test by executing the following commands:
+
+Initialize Terraform:
+
+bash
+Copy code
+terraform init
+Run the Test:
+
+bash
+Copy code
+terraform apply -var-file=test_service_account.tf
+This test will verify that when valid variables are supplied, the module creates the service account and applies the required IAM roles successfully.
+
+
+
+
+
+
+You said:
+add the different assert condition with the above test code
+ChatGPT said:
+ChatGPT
+To enhance the test with different assert conditions, you can add checks for specific outputs, resource existence, and state validation using tftest. Here’s how you can expand the test by asserting the expected behavior of the Terraform module.
+
+Test File with Asserts: test_service_account.tf
+hcl
+Copy code
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 4.0"
+    }
+  }
+}
+
+# Define the test function for applying the valid variables
+tftest "basic_apply_valid_variables" {
+  test_name = "Basic apply with valid variables"
+  
+  # Load variables from a valid configuration
+  variables = {
+    account_id                = "test-metric-reader"
+    project_id                = "test-project-id"
+    display_name              = "Test Metric Reader"
+    cluster_project_id        = "test-cluster-project-id"
+    k8s_namespace             = "test-namespace"
+    metric_reader_k8s_account = "test-metric-reader"
+  }
+
+  # Execute basic apply
+  apply = true
+
+  # Expected outputs
+  expected_outputs = {
+    service_account_email = "test-metric-reader@test-project-id.iam.gserviceaccount.com"
+    service_account_name  = "projects/test-project-id/serviceAccounts/test-metric-reader@test-project-id.iam.gserviceaccount.com"
+  }
+
+  # Assert conditions
+
+  # Assert that the service account email matches the expected format
+  assert {
+    condition     = module.test_grafana_service_account.service_account_email == "test-metric-reader@test-project-id.iam.gserviceaccount.com"
+    error_message = "Service account email does not match the expected format."
+  }
+
+  # Assert that the service account name is in the correct project
+  assert {
+    condition     = module.test_grafana_service_account.service_account_name == "projects/test-project-id/serviceAccounts/test-metric-reader@test-project-id.iam.gserviceaccount.com"
+    error_message = "Service account name is incorrect or in the wrong project."
+  }
+
+  # Assert that the Google IAM role "monitoring.viewer" is applied to the service account
+  assert {
+    condition     = google_project_iam_member.metric_reader_viewer.role == "roles/monitoring.viewer"
+    error_message = "Monitoring viewer role not assigned to the service account."
+  }
+
+  # Assert that Workload Identity User IAM role is correctly assigned to the Kubernetes service account
+  assert {
+    condition     = google_project_iam_member.workload_identity_user.role == "roles/iam.workloadIdentityUser"
+    error_message = "Workload Identity User role not correctly assigned."
+  }
+
+  # Assert the service account resource exists in the state
+  assert {
+    condition     = google_service_account.metric_reader != null
+    error_message = "Service account resource not created."
+  }
+
+  # Assert that the service account display name matches the expected value
+  assert {
+    condition     = google_service_account.metric_reader.display_name == "Test Metric Reader"
+    error_message = "Service account display name does not match."
+  }
+
+}
+Explanation of Assertions:
+Service Account Email Assertion: This checks if the service_account_email output matches the expected format.
+
+Service Account Name Assertion: Ensures that the service account is created in the correct project and has the right naming convention.
+
+IAM Role "monitoring.viewer" Assertion: Verifies that the roles/monitoring.viewer IAM role has been assigned to the service account.
+
+Workload Identity User IAM Role Assertion: Checks whether the Kubernetes service account is correctly bound to the roles/iam.workloadIdentityUser role.
+
+Resource Existence Assertion: Confirms that the service account resource was created and exists in the Terraform state.
+
+Service Account Display Name Assertion: Ensures that the display name of the created service account matches the provided value.
+
+Running the Test with Asserts
+Initialize Terraform:
+
+bash
+Copy code
+terraform init
+Run the Test:
+
+bash
+Copy code
+terraform apply -var-file=test_service_account.tf
+The test will now check these conditions, ensuring the service account, IAM roles, and related resources behave as expected. If any assertion fails, an error message will indicate the cause.
+
+
+
+
+
+
+===================================================================================================================================================================
+
+
+
+
 import os
 import sys
 import time

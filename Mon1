@@ -1,3 +1,43 @@
+
+Introduction
+The Common Data Platform (CDP) serves as the centralized hub for managing all transactional data within the organization. This platform is designed to streamline data storage, integration, and accessibility, acting as the single source of truth for organizational data. By consolidating data into a unified system, the CDP ensures scalability, governance, and seamless data access across various domains.
+
+The platform is built to provide robust interfaces, enabling data to be accessed and utilized by downstream systems through APIs and other integration mechanisms. This ensures that the data is not only stored efficiently but also readily available for analytics, reporting, and operational processes. The CDP represents a critical step in establishing a comprehensive data infrastructure that supports innovation, compliance, and efficient data-driven decision-making across the organization.
+
+Scope
+The scope of the Common Data Platform includes the following key components:
+
+Centralized Data Management:
+
+All transactional data and relevant reference/master data will be stored within the CDP.
+The platform will serve as a unified repository, eliminating data silos and avoiding redundant data copies.
+Data will be stored and made available in various forms, such as:
+"As received from source" for raw data needs and traceability.
+"Integrated with reference/master data" to ensure consistency and integrity.
+"Enriched for specific purposes" to meet business-specific requirements.
+Data Accessibility and Interfaces:
+
+Data will be made accessible through well-defined APIs, enabling seamless integration with other systems and tools.
+Reporting and analytics solutions, including tools like Power BI, will consume data directly from the CDP.
+Data products will be created and governed through defined SLAs and ownership agreements.
+Data Governance and Compliance:
+
+The CDP will enforce data governance rules to ensure compliance with regulatory and organizational standards.
+A strict separation will be maintained between data integration processes and data provisioning for analytical or operational purposes.
+Clear ownership of data pipelines and processes will be defined to enhance accountability and transparency.
+Scalability and Efficiency:
+
+The platform is designed to scale with the organization’s needs, supporting high data volumes and complex use cases.
+It enables faster time-to-market for business features by streamlining deployment and integration processes.
+By acting as a single source of truth, the CDP minimizes redundancies and ensures efficient data processing.
+Decentralized Responsibility:
+
+While the CDP acts as the central platform, responsibility for data ownership, pipelines, and processes will remain decentralized across business units and domains.
+A central data catalog will provide visibility into data assets, ensuring transparency and ease of access.
+The Common Data Platform is a foundational element of the organization’s data strategy, enabling seamless data integration, governance, and access. It empowers the organization to achieve operational excellence, meet compliance requirements, and drive innovation through reliable and efficient data management.
+
+
+====================================================================================================================================================
 # Assert that Workload Identity User IAM role is assigned to the Kubernetes service account at the service account level
   assert {
     condition     = google_service_account_iam_member.metric_reader_viewer.role == "roles/iam.workloadIdentityUser"

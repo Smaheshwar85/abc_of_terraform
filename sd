@@ -1,3 +1,37 @@
+Security Document Details: Secret Authentication Information
+1. Cloud Service Regarding the Secret Authentication Information
+Primary Service Used: HashiCorp Vault
+HashiCorp Vault serves as the central secrets management solution for securely storing and managing sensitive information such as keys, passwords, and certificates.
+In this workflow:
+Keys are created on-premises and stored in Vault for backup.
+These keys are later imported into Google Cloud KMS using the secure import method (rsa-oaep-3072-sha1-aes-256).
+2. Storage Location of Secret Authentication Information / Password Management System
+System/Location:
+HashiCorp Vault serves as the primary storage and management system.
+Vault is deployed on-premises or in a hybrid environment, depending on organizational requirements.
+Backend Storage Options:
+Consul: A distributed key-value store often used as Vault's backend.
+Integrated Storage: Vault's native storage mechanism.
+Database: Optionally, a relational database such as PostgreSQL or MySQL can be used for storing Vault data.
+Separation by Stages:
+Secrets are stored per environment (e.g., dev, staging, prod) to ensure isolation and compliance.
+3. Stored Authentication Information
+Encryption:
+HashiCorp Vault Encryption:
+Data at rest is encrypted using AES-256-GCM.
+Encryption keys for stored secrets are managed by Vault's internal KMS.
+Google Cloud KMS:
+Imported keys are encrypted at rest using AES-256 as per Google Cloud's encryption standards.
+Keys are protected by regional KeyRings to maintain control over their geographic location and comply with regulatory requirements.
+Secure Import:
+The key material is imported into GCP KMS using the RSA-OAEP-3072-SHA1-AES-256 wrapping method, ensuring secure transmission and storage.
+
+
+
+
+
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
 The purpose of the asset is to provide a comprehensive data management platform through the implementation of a data mesh architecture. It enables self-service analytics and reporting for employees while also serving as the foundation for group-wide data integration architecture. This ensures a unified approach to data management, analytics, and integration across the organization.
 
 Scope:

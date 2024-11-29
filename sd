@@ -1,3 +1,89 @@
+The purpose of the asset is to provide a comprehensive data management platform through the implementation of a data mesh architecture. It enables self-service analytics and reporting for employees while also serving as the foundation for group-wide data integration architecture. This ensures a unified approach to data management, analytics, and integration across the organization.
+
+Scope:
+The security documentation covers all aspects of the platform, including:
+
+Data management, storage, and access control mechanisms.
+Security protocols for analytics and reporting functionalities.
+Group-wide data integration architecture.
+Connections between the platform and organizational systems.
+Protection measures against threats, vulnerabilities, and breaches.
+
+Records of Inventory: Identification of Cloud Services and Asset Maintenance
+Asset Name	Cloud Service	Region	Workload Type	Owner	Purpose
+Real-time Event Stream	Pub/Sub	us-central1	Streaming	Event Processing Team	Manages real-time data streams from various sources to other systems.
+Data Streaming Service	Cloud Data Stream	us-central1	Streaming	Data Engineering Team	Captures, processes, and streams data from external systems into GCP.
+Data Streaming Pipeline	Dataflow	us-east1	Streaming	Data Engineering Team	Processes streaming data and performs real-time transformations.
+Batch (Push) Data Transfer	Cloud Storage / BigQuery Transfer Service	us-east1	Batch (Push)	Data Engineering Team	Handles scheduled data transfers for batch processing into BigQuery.
+Batch (Pull) Data Pipeline	Cloud Run / Dataflow	us-central1	Batch (Pull)	Data Engineering Team	Facilitates periodic pulling of data from external sources for processing.
+Customer Transaction Database	Cloud SQL	us-central1	Transactional	Data Engineering Team	Stores transactional data for customer activities and interactions.
+Data Warehouse	BigQuery	us-east1	Analytical	Analytics Team	Serves as the primary analytical repository for querying large datasets.
+Big Data File Storage	Cloud Storage	asia-southeast1	File Storage	Data Engineering Team	Stores raw and processed files in different formats (e.g., Avro, Parquet).
+API Service	Cloud Run	us-west1	API Service	DevOps Team	Hosts APIs used for exposing services to other systems and applications.
+Data Processing Pipeline	Dataflow / Dataproc	us-central1	Data Processing	Data Engineering Team	Orchestrates and manages large-scale data processing and transformation tasks.
+File Storage (CSV, JSON, Parquet)	Cloud Storage	europe-west1	File Storage	Data Engineering Team	Stores structured data files for further processing or analysis.
+
+
+Based on the diagram and the provided information, here’s how the ownership of assets and cloud-native services can be described, depending on the category of cloud services (IaaS, PaaS, SaaS).
+
+Ownership of Assets Based on Cloud Service Category:
+IaaS (Infrastructure as a Service):
+
+Ownership: The assets (infrastructure components such as virtual machines, networking, and storage) belong to the organization.
+Description: The organization has more control over the infrastructure, managing servers, storage, and networks. The cloud provider offers the foundational services like compute, storage, and networking, but the organization is responsible for managing these resources at the operating system and application level.
+Cloud Service Example: Google Cloud Compute Engine (Virtual Machines), Google Cloud Storage, Virtual Networks.
+PaaS (Platform as a Service):
+
+Ownership: The application assets belong to the organization; however, the underlying infrastructure (compute, networking, and storage) is managed by the cloud service provider.
+Description: The organization can focus on application development while the cloud provider manages the platform, including scaling, updates, and patching. PaaS abstracts the management of the underlying infrastructure and provides a ready-to-use environment for development and deployment.
+Cloud Service Example: Google App Engine, Google Cloud Run, Cloud Functions, Dataflow (for data processing pipelines).
+SaaS (Software as a Service):
+
+Ownership: The cloud service provider owns and manages the application and its underlying infrastructure.
+Description: The organization uses the software without needing to manage the infrastructure or platform. SaaS provides a fully managed service where everything is handled by the provider, and the organization simply uses the software via a web interface or API.
+Cloud Service Example: Google BigQuery, Google Pub/Sub (for messaging services), Cloud Data Stream (for data streaming).
+Cloud-Native Cloud Service Provider Services Used:
+Cloud Service	Category	Description of Ownership
+Google Compute Engine	IaaS	The organization manages the infrastructure (virtual machines, storage, etc.), while the cloud provider manages the hardware and the physical layer.
+Cloud Storage	IaaS	The organization manages the data stored, while Google Cloud provides the storage infrastructure and scalability.
+Cloud Pub/Sub	PaaS	The cloud provider manages the messaging infrastructure, while the organization owns and controls the data and events flowing through Pub/Sub.
+Google App Engine	PaaS	The cloud provider manages the platform, while the organization owns the applications deployed.
+Google Cloud Run	PaaS	The organization deploys containerized applications, while the provider handles the scaling and infrastructure.
+Cloud Functions	PaaS	The organization writes and deploys event-driven code, while the provider handles the infrastructure and scaling.
+BigQuery	SaaS	The cloud provider fully manages the data warehousing platform, while the organization owns the data stored in BigQuery.
+Cloud Data Stream	SaaS	The cloud provider manages the data streaming service, while the organization owns the data streams and the resulting data.
+Dataflow	PaaS	The cloud provider manages the data processing pipeline infrastructure, while the organization owns the data processed through the pipeline.
+Dataproc	PaaS	The cloud provider manages the Hadoop/Spark cluster infrastructure, while the organization owns and controls the data processed.
+Summary:
+IaaS: The organization owns the assets at the infrastructure level, such as virtual machines and storage, while the cloud provider manages the physical infrastructure.
+PaaS: The organization owns the application and data, but the cloud provider manages the platform and infrastructure.
+SaaS: The cloud provider owns and manages the application and infrastructure, while the organization uses the software and owns the data.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+..................................................................................................................................................................................................
+
 The Centralized Data Platform (CDP) serves as a centralized hub for processing all business data originating from the HBD system. The data is stored in BigQuery, a fully-managed data warehouse service provided by Google Cloud Platform (GCP). This platform is meticulously designed to streamline data storage, integration, and accessibility, ensuring seamless interaction with other applications and systems across the organization.
 
 The CDP is instrumental in processing diverse transactional and analytical data, performing complex calculations, and facilitating advanced analytics to derive actionable business insights. By leveraging GCP's robust services, the platform ensures scalability, reliability, and high-performance data processing to meet the organization's dynamic needs.
